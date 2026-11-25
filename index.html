@@ -3,39 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FitTrack - Login</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>FitTrack - Entrar</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        }
+        h1 { text-align: center; color: #10b981; margin-bottom: 8px; }
+        .subtitulo { text-align: center; color: #64748b; margin-bottom: 24px; }
+        .abas { display: flex; margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; }
+        .aba {
+            flex: 1; padding: 12px; text-align: center; cursor: pointer;
+            font-weight: 600; color: #64748b; border-bottom: 3px solid transparent;
+        }
+        .aba.ativa { color: #10b981; border-bottom-color: #10b981; }
+        form { display: flex; flex-direction: column; gap: 14px; }
+        input { padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; }
+        button {
+            padding: 12px; background-color: #10b981; color: white; border: none;
+            border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px;
+        }
+        button:hover { background-color: #059669; }
+        .mensagem { margin-top: 16px; text-align: center; font-size: 14px; min-height: 20px; }
+        .sucesso { color: #10b981; }
+        .erro { color: #ef4444; }
+        .form-cadastro { display: none; }
+    </style>
 </head>
 <body>
-    <main class="auth-container">
-        <div class="auth-card">
-            <header class="auth-header">
-                <h1>FitTrack</h1>
-                <p>Entre com seu usuário para acompanhar suas metas</p>
-            </header>
+    <div class="card">
+        <h1>FitTrack</h1>
+        <p class="subtitulo">Seu acompanhamento de saúde</p>
 
-            <form id="login-form">
-                <div class="input-group">
-                    <label for="usuario">Nome de Usuário</label>
-                    <input type="text" id="usuario" placeholder="Digite seu usuário" required>
-                </div>
-
-                <div class="input-group">
-                    <label for="senha">Senha</label>
-                    <input type="password" id="senha" placeholder="Digite sua senha" required>
-                </div>
-
-                <p id="mensagem-erro" class="erro-texto"></p>
-
-                <button type="submit" class="btn-principal">Entrar</button>
-            </form>
-
-            <footer class="auth-footer">
-                <p>Ainda não tem conta? <a href="cadastro.html">Cadastre-se</a></p>
-            </footer>
+        <div class="abas">
+            <div class="aba ativa" id="aba-login">Entrar</div>
+            <div class="aba" id="aba-cadastro">Criar Conta</div>
         </div>
-    </main>
 
-    <script src="login.js"></script>
+        <form id="form-login" class="form-login">
+            <input type="email" id="login-email" placeholder="Seu e-mail" required>
+            <input type="password" id="login-senha" placeholder="Sua senha" required>
+            <button type="submit">Entrar</button>
+        </form>
+
+        <form id="form-cadastro" class="form-cadastro">
+            <input type="text" id="cadastro-nome" placeholder="Seu nome completo" required>
+            <input type="email" id="cadastro-email" placeholder="Seu e-mail" required>
+            <input type="password" id="cadastro-senha" placeholder="Criar senha (mínimo 6 dígitos)" required>
+            <button type="submit">Criar Conta</button>
+        </form>
+
+        <div id="mensagem" class="mensagem"></div>
+    </div>
+
+    <script type="module">
+        import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from './firebase-config.js';
+        import { salvarDadosUsuario } from './dados-service.js';
+
+        const abaLogin = document.getElementById('aba-login');
+        const abaCadastro = document.getElementById('aba-cadastro');
+        const formLogin = document.getElementById('form-login');
+        const formCadastro = document.getElementById('form-cadastro');
+        const mensagem = document.getElementById('mensagem');
+
+        function mostrarAbaLogin() {
+            abaLogin.classList.add('ativa');
+            abaCadastro.classList.remove('ativa');
+            formLogin.style.display = 'flex';
+            formCadastro.style.display = 'none';
+            mensagem.textContent = '';
+        }
+
+        function mostrarAbaCadastro() {
+            abaLogin.classList.remove('ativa');
+            abaCadastro.classList.add('ativa');
+            formLogin.style.display = 'none';
+            formCadastro.style.display = 'flex';
+            mensagem.textContent = '';
+        }
+
+        abaLogin.addEventListener('click', mostrarAbaLogin);
+        abaCadastro.addEventListener('click', mostrarAbaCadastro);
+
+        // Cadastro
+        formCadastro.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            mensagem.textContent = '';
+            
+            const nome = document.getElementById('cadastro-nome').value.trim();
+            const email = document.getElementById('cadastro-email').value.trim();
+            const senha = document.getElementById('cadastro-senha').value;
+
+            try {
+                const userCred = await createUserWithEmailAndPassword(auth, email, senha);
+                await salvarDadosUsuario({
+                    nomeCompleto: nome,
+                    email: email,
+                    metas: { calorias: 2000, agua: 2500, atividade: 45 },
+                    registros: {}
+                });
+                mensagem.className = 'mensagem sucesso';
+                mensagem.textContent = '✅ Conta criada! Entrando...';
+                setTimeout(() => window.location.href = 'dashboard.html', 1200);
+            } catch (erro) {
+                mensagem.className = 'mensagem erro';
+                if (erro.code === 'auth/email-already-in-use') {
+                    mensagem.textContent = '⚠️ Este e-mail já está cadastrado';
+                } else if (erro.code === 'auth/weak-password') {
+                    mensagem.textContent = '⚠️ A senha precisa ter pelo menos 6 caracteres';
+                } else {
+                    mensagem.textContent = '❌ Erro: ' + erro.message;
+                }
+            }
+        });
+
+        // Login
+        formLogin.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            mensagem.textContent = '';
+            
+            const email = document.getElementById('login-email').value.trim();
+            const senha = document.getElementById('login-senha').value;
+
+            try {
+                await signInWithEmailAndPassword(auth, email, senha);
+                mensagem.className = 'mensagem sucesso';
+                mensagem.textContent = '✅ Entrando...';
+                setTimeout(() => window.location.href = 'dashboard.html', 800);
+            } catch (erro) {
+                mensagem.className = 'mensagem erro';
+                if (erro.code === 'auth/user-not-found' || erro.code === 'auth/wrong-password') {
+                    mensagem.textContent = '⚠️ E-mail ou senha incorretos';
+                } else {
+                    mensagem.textContent = '❌ Erro: ' + erro.message;
+                }
+            }
+        });
+    </script>
 </body>
 </html>
