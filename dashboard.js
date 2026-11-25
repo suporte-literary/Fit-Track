@@ -1,53 +1,72 @@
-// dashboard.js — VERSÃO COM FIREBASE
-import { esperarUsuarioLogado, salvarDadosUsuario, carregarDadosUsuario, sair } from './dados-service.js';
-
+// dashboard.js — Versão compatível com GitHub Pages
 let usuarioAtual = null;
 let dadosUsuario = null;
-let dataVisualizacao = new Date();
 let dataSelecionada = formatarDataISO(new Date());
 
 // ============= INICIALIZAÇÃO =============
-iniciar();
-
 async function iniciar() {
-    // Verificar se usuário está logado
-    const user = await esperarUsuarioLogado();
-    if (!user) {
-        window.location.href = 'index.html';
-        return;
+    try {
+        // Aguardar login
+        usuarioAtual = await new Promise(resolve => {
+            const unsubscribe = firebase.auth().onAuthStateChanged(user => {
+                unsubscribe();
+                resolve(user);
+            });
+        });
+
+        if (!usuarioAtual) {
+            window.location.href = 'index.html';
+            return;
+        }
+
+        // Carregar dados do Firestore
+        const docSnap = await firebase.firestore().collection('usuarios').doc(usuarioAtual.uid).get();
+        
+        if (docSnap.exists) {
+            dadosUsuario = docSnap.data();
+        } else {
+            dadosUsuario = {
+                nomeCompleto: '',
+                usuario: '',
+                metas: { calorias: 2000, agua: 2500, atividade: 45 },
+                registros: {}
+            };
+        }
+
+        if (!dadosUsuario.metas) dadosUsuario.metas = { calorias: 2000, agua: 2500, atividade: 45 };
+        if (!dadosUsuario.registros) dadosUsuario.registros = {};
+
+        // Saudação
+        const primeiroNome = dadosUsuario.nomeCompleto 
+            ? dadosUsuario.nomeCompleto.split(' ')[0] 
+            : usuarioAtual.email.split('@')[0];
+        const el = document.getElementById('saudacao-usuario');
+        if (el) el.textContent = `Olá, ${primeiroNome}`;
+
+        // Botão Sair
+        const btnSair = document.getElementById('btn-sair');
+        if (btnSair) btnSair.addEventListener('click', async () => {
+            await firebase.auth().signOut();
+            window.location.href = 'index.html';
+        });
+
+        carregarInputsMetas();
+        renderizarCalendario();
+        atualizarPainelDoDia();
+        
+    } catch (erro) {
+        console.error('Erro ao inicializar:', erro);
     }
-    usuarioAtual = user;
-    
-    // Carregar dados do Firestore
-    dadosUsuario = await carregarDadosUsuario();
-    if (!dadosUsuario) {
-        dadosUsuario = {
-            nomeCompleto: '',
-            metas: { calorias: 2000, agua: 2500, atividade: 45 },
-            registros: {}
-        };
-    }
-    if (!dadosUsuario.metas) dadosUsuario.metas = { calorias: 2000, agua: 2500, atividade: 45 };
-    if (!dadosUsuario.registros) dadosUsuario.registros = {};
-
-    // Saudação
-    const primeiroNome = dadosUsuario.nomeCompleto 
-        ? dadosUsuario.nomeCompleto.split(' ')[0] 
-        : usuarioAtual.email.split('@')[0];
-    document.getElementById('saudacao-usuario').textContent = `Olá, ${primeiroNome}`;
-
-    // Botão Sair
-    const btnSair = document.getElementById('btn-sair');
-    if (btnSair) btnSair.addEventListener('click', sair);
-
-    carregarInputsMetas();
-    renderizarCalendario();
-    atualizarPainelDoDia();
 }
 
 // ============= SALVAR NO FIREBASE =============
 async function salvar() {
-    await salvarDadosUsuario(dadosUsuario);
+    if (!usuarioAtual) return;
+    try {
+        await firebase.firestore().collection('usuarios').doc(usuarioAtual.uid).set(dadosUsuario, { merge: true });
+    } catch (erro) {
+        console.error('Erro ao salvar:', erro);
+    }
 }
 
 // ============= FUNÇÕES AUXILIARES =============
@@ -149,62 +168,72 @@ function renderizarCalendario() {
 function atualizarPainelDoDia() {
     const reg = obterRegistrosDoDia(dataSelecionada);
 
-    document.getElementById('data-selecionada').textContent = formatarDataBr(dataSelecionada);
+    const elData = document.getElementById('data-selecionada');
+    if (elData) elData.textContent = formatarDataBr(dataSelecionada);
 
     // Calorias
     const totalCal = reg.calorias.reduce((s, i) => s + Number(i.kcal || 0), 0);
-    document.getElementById('total-calorias').textContent = totalCal.toLocaleString('pt-BR');
-    document.getElementById('meta-calorias-texto').textContent = `/ ${dadosUsuario.metas.calorias.toLocaleString('pt-BR')} kcal`;
-    const percCal = Math.min((totalCal / dadosUsuario.metas.calorias) * 100, 100);
-    document.getElementById('barra-calorias').style.width = `${percCal}%`;
-    const listaCal = document.getElementById('lista-refeicoes');
-    if (listaCal) {
-        listaCal.innerHTML = '';
+    const elTotalCal = document.getElementById('total-calorias');
+    const elMetaCal = document.getElementById('meta-calorias-texto');
+    const elBarraCal = document.getElementById('barra-calorias');
+    const elListaCal = document.getElementById('lista-refeicoes');
+    
+    if (elTotalCal) elTotalCal.textContent = totalCal.toLocaleString('pt-BR');
+    if (elMetaCal) elMetaCal.textContent = `/ ${dadosUsuario.metas.calorias.toLocaleString('pt-BR')} kcal`;
+    if (elBarraCal) elBarraCal.style.width = `${Math.min((totalCal / dadosUsuario.metas.calorias) * 100, 100)}%`;
+    if (elListaCal) {
+        elListaCal.innerHTML = '';
         reg.calorias.forEach((item, indice) => {
             const li = document.createElement('li');
             li.innerHTML = `
                 ${item.nome}: ${item.kcal} kcal
                 <button class="btn-excluir" data-tipo="calorias" data-indice="${indice}">×</button>
             `;
-            listaCal.appendChild(li);
+            elListaCal.appendChild(li);
         });
     }
 
     // Água
     const totalAgua = reg.agua.reduce((s, i) => s + Number(i.valor || 0), 0);
-    document.getElementById('total-agua').textContent = totalAgua.toLocaleString('pt-BR');
-    document.getElementById('meta-agua-texto').textContent = `/ ${dadosUsuario.metas.agua.toLocaleString('pt-BR')} ml`;
-    const percAgua = Math.min((totalAgua / dadosUsuario.metas.agua) * 100, 100);
-    document.getElementById('barra-agua').style.width = `${percAgua}%`;
-    const listaAgua = document.getElementById('lista-agua');
-    if (listaAgua) {
-        listaAgua.innerHTML = '';
+    const elTotalAgua = document.getElementById('total-agua');
+    const elMetaAgua = document.getElementById('meta-agua-texto');
+    const elBarraAgua = document.getElementById('barra-agua');
+    const elListaAgua = document.getElementById('lista-agua');
+    
+    if (elTotalAgua) elTotalAgua.textContent = totalAgua.toLocaleString('pt-BR');
+    if (elMetaAgua) elMetaAgua.textContent = `/ ${dadosUsuario.metas.agua.toLocaleString('pt-BR')} ml`;
+    if (elBarraAgua) elBarraAgua.style.width = `${Math.min((totalAgua / dadosUsuario.metas.agua) * 100, 100)}%`;
+    if (elListaAgua) {
+        elListaAgua.innerHTML = '';
         reg.agua.forEach((item, indice) => {
             const li = document.createElement('li');
             li.innerHTML = `
                 ${item.valor} ml
                 <button class="btn-excluir" data-tipo="agua" data-indice="${indice}">×</button>
             `;
-            listaAgua.appendChild(li);
+            elListaAgua.appendChild(li);
         });
     }
 
     // Atividade
     const totalAtiv = reg.atividade.reduce((s, i) => s + Number(i.valor || 0), 0);
-    document.getElementById('total-atividade').textContent = totalAtiv.toLocaleString('pt-BR');
-    document.getElementById('meta-atividade-texto').textContent = `/ ${dadosUsuario.metas.atividade.toLocaleString('pt-BR')} min`;
-    const percAtiv = Math.min((totalAtiv / dadosUsuario.metas.atividade) * 100, 100);
-    document.getElementById('barra-atividade').style.width = `${percAtiv}%`;
-    const listaAtiv = document.getElementById('lista-atividade');
-    if (listaAtiv) {
-        listaAtiv.innerHTML = '';
+    const elTotalAtiv = document.getElementById('total-atividade');
+    const elMetaAtiv = document.getElementById('meta-atividade-texto');
+    const elBarraAtiv = document.getElementById('barra-atividade');
+    const elListaAtiv = document.getElementById('lista-atividade');
+    
+    if (elTotalAtiv) elTotalAtiv.textContent = totalAtiv.toLocaleString('pt-BR');
+    if (elMetaAtiv) elMetaAtiv.textContent = `/ ${dadosUsuario.metas.atividade.toLocaleString('pt-BR')} min`;
+    if (elBarraAtiv) elBarraAtiv.style.width = `${Math.min((totalAtiv / dadosUsuario.metas.atividade) * 100, 100)}%`;
+    if (elListaAtiv) {
+        elListaAtiv.innerHTML = '';
         reg.atividade.forEach((item, indice) => {
             const li = document.createElement('li');
             li.innerHTML = `
                 ${item.nome}: ${item.valor} min
                 <button class="btn-excluir" data-tipo="atividade" data-indice="${indice}">×</button>
             `;
-            listaAtiv.appendChild(li);
+            elListaAtiv.appendChild(li);
         });
     }
 }
@@ -272,3 +301,6 @@ document.addEventListener('click', async (e) => {
         renderizarCalendario();
     }
 });
+
+// Iniciar quando a página carregar
+document.addEventListener('DOMContentLoaded', iniciar);
