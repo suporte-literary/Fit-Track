@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitTrack - Meu Painel</title>
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-content">
+            <h1>FitTrack</h1>
+            <!-- ✅ Navegação entre as telas -->
+            <nav class="navegacao">
+                <a href="dashboard.html" class="link-nav ativo">📋 Painel Diário</a>
+                <a href="visao-geral.html" class="link-nav">📊 Visão Geral</a>
+            </nav>
+            <div class="user-info">
+                <span id="saudacao-usuario">Olá!</span>
+                <button type="button" id="btn-sair" class="btn-sair">Sair</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard-grid">
+        <!-- Coluna da Esquerda: Calendário e Metas -->
+        <aside class="sidebar">
+            <section class="card calendario-card">
+                <div class="calendario-header">
+                    <button type="button" id="mes-anterior" aria-label="Mês anterior">&lt;</button>
+                    <h2 id="mes-ano-atual">Mês Ano</h2>
+                    <button type="button" id="proximo-mes" aria-label="Próximo mês">&gt;</button>
+                </div>
+                <div class="dias-semana">
+                    <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+                </div>
+                <div id="grade-dias" class="grade-dias"></div>
+            </section>
+
+            <section class="card metas-card">
+                <h3>Minhas Metas Diárias</h3>
+                <form id="form-metas">
+                    <div class="meta-item">
+                        <label for="meta-calorias">Calorias (kcal)</label>
+                        <input type="number" id="meta-calorias" min="500" required>
+                    </div>
+                    <div class="meta-item">
+                        <label for="meta-agua">Água (ml)</label>
+                        <input type="number" id="meta-agua" min="250" step="50" required>
+                    </div>
+                    <div class="meta-item">
+                        <label for="meta-atividade">Atividade Física (min)</label>
+                        <input type="number" id="meta-atividade" min="5" required>
+                    </div>
+                    <button type="submit" class="btn-salvar-metas">Atualizar Metas</button>
+                </form>
+            </section>
+        </aside>
+
+        <!-- Coluna da Direita: Registros do Dia -->
+        <section class="conteudo-dia">
+            <div class="dia-banner">
+                <h2>Registros de <span id="data-selecionada-texto">Hoje</span></h2>
+                <p>Selecione qualquer dia no calendário para consultar ou editar</p>
+            </div>
+
+            <!-- Cartão de Calorias e Refeições (Largo no topo) -->
+            <article class="card tracker-card card-largo">
+                <div class="tracker-header">
+                    <h3>Calorias e Refeições</h3>
+                    <span id="status-calorias" class="badge">0 / 2000 kcal</span>
+                </div>
+                <div class="barra-fundo">
+                    <div id="barra-calorias" class="barra-progresso cor-calorias"></div>
+                </div>
+
+                <form id="form-calorias" class="form-refeicao">
+                    <input type="text" id="refeicao-nome" placeholder="Refeição (Ex: Almoço)" list="sugestoes-refeicao" required>
+                    <datalist id="sugestoes-refeicao">
+                        <option value="Café da Manhã">
+                        <option value="Almoço">
+                        <option value="Lanche da Tarde">
+                        <option value="Jantar">
+                    </datalist>
+                    <input type="text" id="alimento-nome" placeholder="Alimento (Ex: Arroz)" required>
+                    <input type="number" id="alimento-gramas" placeholder="Gramas (g)" min="1" required>
+                    <input type="number" id="alimento-kcal" placeholder="Calorias (kcal)" min="1" required>
+                    <button type="submit" class="btn-add-laranja">+</button>
+                </form>
+
+                <!-- Onde as refeições agrupadas vão aparecer -->
+                <div id="lista-refeicoes" class="lista-refeicoes"></div>
+            </article>
+
+            <!-- Grade Inferior: Água e Atividade Física lado a lado -->
+            <div class="trackers-grid">
+                <!-- Cartão de Água -->
+                <article class="card tracker-card">
+                    <div class="tracker-header">
+                        <h3>Água</h3>
+                        <span id="status-agua" class="badge">0 / 2500 ml</span>
+                    </div>
+                    <div class="barra-fundo">
+                        <div id="barra-agua" class="barra-progresso cor-agua"></div>
+                    </div>
+                    <div class="atalhos-agua">
+                        <button type="button" class="btn-agua-rapido" data-ml="250">+ 250ml</button>
+                        <button type="button" class="btn-agua-rapido" data-ml="500">+ 500ml</button>
+                    </div>
+                    <form id="form-agua" class="form-registro">
+                        <input type="number" id="valor-agua" placeholder="Outra qtd (ml)" min="1" required>
+                        <button type="submit">+</button>
+                    </form>
+                    <ul id="lista-agua" class="lista-registros"></ul>
+                </article>
+
+                <!-- Cartão de Atividades Físicas -->
+                <article class="card tracker-card">
+                    <div class="tracker-header">
+                        <h3>Atividade Física</h3>
+                        <span id="status-atividade" class="badge">0 / 45 min</span>
+                    </div>
+                    <div class="barra-fundo">
+                        <div id="barra-atividade" class="barra-progresso cor-atividade"></div>
+                    </div>
+                    <form id="form-atividade" class="form-registro">
+                        <input type="text" id="desc-atividade" placeholder="Ex: Corrida" required>
+                        <input type="number" id="valor-atividade" placeholder="Minutos" min="1" required>
+                        <button type="submit">+</button>
+                    </form>
+                    <ul id="lista-atividade" class="lista-registros"></ul>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>

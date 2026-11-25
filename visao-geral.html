@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitTrack - Visão Geral</title>
+    <link rel="stylesheet" href="visao-geral.css">
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-content">
+            <h1>FitTrack</h1>
+            <div class="navegacao">
+                <a href="dashboard.html" class="link-nav">📋 Painel Diário</a>
+                <span class="link-nav ativo">📊 Visão Geral</span>
+            </div>
+            <div class="user-info">
+                <span id="saudacao-usuario">Olá!</span>
+                <button type="button" id="btn-sair" class="btn-sair">Sair</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="conteudo-principal">
+        <!-- Seletor de Período -->
+        <div class="seletor-periodo">
+            <button type="button" class="btn-periodo ativo" data-periodo="semana">📅 Esta Semana</button>
+            <button type="button" class="btn-periodo" data-periodo="mes">📆 Este Mês</button>
+            <button type="button" class="btn-periodo" data-periodo="ano">🗓️ Este Ano</button>
+        </div>
+
+        <!-- Cabeçalho do Período -->
+        <div class="cabecalho-periodo">
+            <h2 id="titulo-periodo">Resumo da Semana</h2>
+            <p id="intervalo-datas" class="subtitulo-periodo">24/11/2026 a 30/11/2026</p>
+        </div>
+
+        <!-- Cartões de Resumo -->
+        <div class="cartoes-resumo">
+            <!-- Calorias -->
+            <article class="cartao-resumo cartao-calorias">
+                <div class="icone-grande">🔥</div>
+                <h3>Calorias</h3>
+                <div class="valor-principal" id="calorias-total">0</div>
+                <div class="detalhes">
+                    <p>Média/dia: <span id="calorias-media">0</span> kcal</p>
+                    <p>Meta cumprida: <span id="calorias-meta">0</span> dias</p>
+                </div>
+                <div class="barra-fundo">
+                    <div id="barra-calorias-geral" class="barra-progresso"></div>
+                </div>
+            </article>
+
+            <!-- Água -->
+            <article class="cartao-resumo cartao-agua">
+                <div class="icone-grande">💧</div>
+                <h3>Água</h3>
+                <div class="valor-principal" id="agua-total">0</div>
+                <div class="detalhes">
+                    <p>Média/dia: <span id="agua-media">0</span> ml</p>
+                    <p>Meta cumprida: <span id="agua-meta">0</span> dias</p>
+                </div>
+                <div class="barra-fundo">
+                    <div id="barra-agua-geral" class="barra-progresso"></div>
+                </div>
+            </article>
+
+            <!-- Atividade Física -->
+            <article class="cartao-resumo cartao-atividade">
+                <div class="icone-grande">🏃</div>
+                <h3>Atividade Física</h3>
+                <div class="valor-principal" id="atividade-total">0</div>
+                <div class="detalhes">
+                    <p>Média/dia: <span id="atividade-media">0</span> min</p>
+                    <p>Meta cumprida: <span id="atividade-meta">0</span> dias</p>
+                </div>
+                <div class="barra-fundo">
+                    <div id="barra-atividade-geral" class="barra-progresso"></div>
+                </div>
+            </article>
+        </div>
+
+        <!-- Gráfico de Tendência -->
+        <section class="secao-grafico">
+            <h3>📈 Acompanhamento Diário</h3>
+            <div class="grafico-container">
+                <div id="grafico-barras" class="grafico-barras">
+                    <!-- Barras geradas dinamicamente pelo JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Tabela de Detalhes -->
+        <section class="secao-tabela">
+            <h3>📝 Detalhes por Dia</h3>
+            <div class="tabela-container">
+                <table class="tabela-dias">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Calorias (kcal)</th>
+                            <th>Água (ml)</th>
+                            <th>Atividade (min)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpo-tabela">
+                        <!-- Linhas geradas dinamicamente pelo JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="visao-geral.js"></script>
+</body>
+</html>
