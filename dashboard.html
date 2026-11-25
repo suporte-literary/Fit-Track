@@ -5,6 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FitTrack - Meu Painel</title>
     <link rel="stylesheet" href="dashboard.css">
+
+    <!-- Firebase v11.0.1 (Versão Compat - funciona sem module e no Firebase Hosting) -->
+    <script src="https://gstatic.com"></script>
+    <script src="https://gstatic.com"></script>
+    <script src="https://gstatic.com"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCLHmqR0bDmq7j-q-E0I456DlAgWMIKkgY",
+            authDomain: "://firebaseapp.com",
+            projectId: "fittrack-59829",
+            storageBucket: "fittrack-59829.firebasestorage.app",
+            messagingSenderId: "384935605390",
+            appId: "1:384935605390:web:2eb5540c6e3031781a85df"
+        };
+        firebase.initializeApp(firebaseConfig);
+    </script>
 </head>
 <body>
     <header class="topbar">
@@ -132,7 +148,7 @@
         </section>
     </main>
 
-    <!-- Único script necessário, carregado como módulo -->
-    <script type="module" src="dashboard.js"></script>
+    <!-- Carrega normalmente sem type="module" -->
+    <script src="dashboard.js"></script>
 </body>
 </html>
