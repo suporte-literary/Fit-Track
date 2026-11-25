@@ -10,48 +10,19 @@ const firebaseConfig = {
   appId: "1:384935605390:web:2eb5540c6e3031781a85df"
 };
 firebase.initializeApp(firebaseConfig);
-
 const db = firebase.firestore();
 
 // ==========================================
-// VARIÁVEIS GLOBAIS
+// VERIFICAR SESSÃO
 // ==========================================
-let usuarioAtual = null;
+const usuarioId = localStorage.getItem('fittrack_usuario_atual');
+if (!usuarioId) {
+    window.location.href = 'index.html';
+}
+
 let dadosUsuario = null;
 let dataVisualizacao = new Date();
 let dataSelecionada = formatarDataISO(new Date());
-
-// ==========================================
-// INICIALIZAÇÃO — VERIFICAR USUÁRIO LOGADO
-// ==========================================
-firebase.auth().onAuthStateChanged(async function(usuario) {
-    if (!usuario) {
-        console.log('⚠️ Usuário não logado — redirecionando...');
-        window.location.href = 'index.html';
-        return;
-    }
-
-    usuarioAtual = usuario;
-    console.log('✅ Usuário logado:', usuario.email);
-
-    // Saudação
-    const primeiroNome = usuario.email.split('@')[0];
-    document.getElementById('saudacao-usuario').textContent = `Olá, ${primeiroNome}!`;
-
-    // Carregar dados do Firebase
-    await carregarDadosDoFirebase();
-
-    // Inicializar tela
-    carregarInputsMetas();
-    renderizarCalendario();
-    atualizarPainelDoDia();
-
-    // Botão Sair
-    document.getElementById('btn-sair').addEventListener('click', async () => {
-        await firebase.auth().signOut();
-        window.location.href = 'index.html';
-    });
-});
 
 // ==========================================
 // FUNÇÕES AUXILIARES
@@ -69,51 +40,12 @@ function formatarDataBr(dataISO) {
 }
 
 // ==========================================
-// FIREBASE — CARREGAR DADOS
-// ==========================================
-async function carregarDadosDoFirebase() {
-    console.log('📂 Carregando dados do Firebase...');
-    
-    try {
-        const docRef = db.collection('usuarios').doc(usuarioAtual.uid);
-        const docSnap = await docRef.get();
-
-        if (docSnap.exists) {
-            dadosUsuario = docSnap.data();
-            console.log('✅ Dados carregados:', dadosUsuario);
-        } else {
-            // Criar documento novo com valores padrão
-            dadosUsuario = {
-                metas: { calorias: 2000, agua: 2500, atividade: 45 },
-                registros: {}
-            };
-            await salvarDadosNoFirebase();
-            console.log('📋 Novo documento criado no Firebase');
-        }
-
-        // Garantir que todas as propriedades existam
-        if (!dadosUsuario.metas) {
-            dadosUsuario.metas = { calorias: 2000, agua: 2500, atividade: 45 };
-        }
-        if (!dadosUsuario.registros) {
-            dadosUsuario.registros = {};
-        }
-    } catch (erro) {
-        console.error('❌ Erro ao carregar:', erro);
-        alert('Erro ao carregar dados: ' + erro.message);
-    }
-}
-
-// ==========================================
-// FIREBASE — SALVAR DADOS
+// SALVAR DADOS NO FIREBASE
 // ==========================================
 async function salvarDadosNoFirebase() {
-    if (!usuarioAtual) return;
-    
-    console.log('💾 Salvando no Firebase...');
     try {
-        await db.collection('usuarios').doc(usuarioAtual.uid).set(dadosUsuario, { merge: true });
-        console.log('✅ Salvo com sucesso!');
+        await db.collection('usuarios').doc(usuarioId).set(dadosUsuario);
+        console.log('✅ Salvo no Firebase!');
         return true;
     } catch (erro) {
         console.error('❌ Erro ao salvar:', erro);
@@ -121,6 +53,69 @@ async function salvarDadosNoFirebase() {
         return false;
     }
 }
+
+// ==========================================
+// CARREGAR DADOS
+// ==========================================
+async function carregarDados() {
+    try {
+        const doc = await db.collection('usuarios').doc(usuarioId).get();
+        
+        if (!doc.exists) {
+            localStorage.removeItem('fittrack_usuario_atual');
+            window.location.href = 'index.html';
+            return;
+        }
+        
+        dadosUsuario = doc.data();
+        console.log('✅ Dados carregados:', dadosUsuario);
+
+        // Garantir que existam as propriedades
+        if (!dadosUsuario.metas) {
+            dadosUsuario.metas = { calorias: 2000, agua: 2500, atividade: 45 };
+        }
+        if (!dadosUsuario.registros) {
+            dadosUsuario.registros = {};
+        }
+
+        // Saudação
+        const primeiroNome = dadosUsuario.nomeCompleto 
+            ? dadosUsuario.nomeCompleto.split(' ')[0] 
+            : dadosUsuario.usuario;
+        document.getElementById('saudacao-usuario').textContent = `Olá, ${primeiroNome}`;
+
+        carregarInputsMetas();
+        renderizarCalendario();
+        atualizarPainelDoDia();
+        
+    } catch (erro) {
+        console.error('❌ Erro ao carregar:', erro);
+        alert('Erro ao carregar: ' + erro.message);
+    }
+}
+
+// ==========================================
+// METAS — CARREGAR E SALVAR
+// ==========================================
+function carregarInputsMetas() {
+    document.getElementById('meta-calorias').value = dadosUsuario.metas.calorias;
+    document.getElementById('meta-agua').value = dadosUsuario.metas.agua;
+    document.getElementById('meta-atividade').value = dadosUsuario.metas.atividade;
+    console.log('📝 Metas carregadas:', dadosUsuario.metas);
+}
+
+document.getElementById('form-metas').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    dadosUsuario.metas.calorias = Number(document.getElementById('meta-calorias').value);
+    dadosUsuario.metas.agua = Number(document.getElementById('meta-agua').value);
+    dadosUsuario.metas.atividade = Number(document.getElementById('meta-atividade').value);
+
+    await salvarDadosNoFirebase();
+    carregarInputsMetas();
+    atualizarPainelDoDia();
+    alert('✅ Metas atualizadas!');
+});
 
 // ==========================================
 // OBTER REGISTROS DO DIA
@@ -193,27 +188,6 @@ document.getElementById('mes-anterior').addEventListener('click', () => {
 document.getElementById('proximo-mes').addEventListener('click', () => {
     dataVisualizacao.setMonth(dataVisualizacao.getMonth() + 1);
     renderizarCalendario();
-});
-
-// ==========================================
-// METAS
-// ==========================================
-function carregarInputsMetas() {
-    document.getElementById('meta-calorias').value = dadosUsuario.metas.calorias;
-    document.getElementById('meta-agua').value = dadosUsuario.metas.agua;
-    document.getElementById('meta-atividade').value = dadosUsuario.metas.atividade;
-}
-
-document.getElementById('form-metas').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    dadosUsuario.metas.calorias = Number(document.getElementById('meta-calorias').value);
-    dadosUsuario.metas.agua = Number(document.getElementById('meta-agua').value);
-    dadosUsuario.metas.atividade = Number(document.getElementById('meta-atividade').value);
-
-    await salvarDadosNoFirebase();
-    carregarInputsMetas();
-    atualizarPainelDoDia();
-    alert('✅ Metas atualizadas!');
 });
 
 // ==========================================
@@ -330,7 +304,7 @@ function renderizarSimples(tipo, lista, meta, unidade) {
 }
 
 // ==========================================
-// ADICIONAR REGISTROS — TODOS SALVAM NO FIREBASE
+// ADICIONAR REGISTROS
 // ==========================================
 
 // Calorias / Refeições
@@ -410,3 +384,16 @@ document.getElementById('form-atividade').addEventListener('submit', async (e) =
     atualizarPainelDoDia();
     renderizarCalendario();
 });
+
+// ==========================================
+// BOTÃO SAIR
+// ==========================================
+document.getElementById('btn-sair').addEventListener('click', () => {
+    localStorage.removeItem('fittrack_usuario_atual');
+    window.location.href = 'index.html';
+});
+
+// ==========================================
+// INICIAR
+// ==========================================
+carregarDados();
