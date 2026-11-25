@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FitTrack - Entrar</title>
+    
+    <!-- ✅ Firebase carregado globalmente (compatível com GitHub Pages) -->
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore-compat.js"></script>
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
         body {
@@ -41,25 +47,27 @@
         .sucesso { color: #10b981; }
         .erro { color: #ef4444; }
         .form-cadastro { display: none; }
+        .carregando { color: #64748b; font-size: 13px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
     <div class="card">
         <h1>FitTrack</h1>
         <p class="subtitulo">Seu acompanhamento de saúde</p>
+        <div id="status-carregando" class="carregando">Carregando...</div>
 
-        <div class="abas">
+        <div class="abas" style="display: none;" id="container-abas">
             <div class="aba ativa" id="aba-login">Entrar</div>
             <div class="aba" id="aba-cadastro">Criar Conta</div>
         </div>
 
-        <form id="form-login" class="form-login">
+        <form id="form-login" class="form-login" style="display: none;">
             <input type="text" id="login-usuario" placeholder="Seu nome de usuário" required>
             <input type="password" id="login-senha" placeholder="Sua senha" required>
             <button type="submit">Entrar</button>
         </form>
 
-        <form id="form-cadastro" class="form-cadastro">
+        <form id="form-cadastro" class="form-cadastro" style="display: none;">
             <input type="text" id="cadastro-nome" placeholder="Seu nome completo" required>
             <input type="text" id="cadastro-usuario" placeholder="Nome de usuário (sem espaços)" required>
             <input type="password" id="cadastro-senha" placeholder="Criar senha (mínimo 6 dígitos)" required>
@@ -69,15 +77,38 @@
         <div id="mensagem" class="mensagem"></div>
     </div>
 
-    <script type="module">
-        import { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, doc, setDoc, getDoc } from './firebase-config.js';
+    <script>
+        // ========== INICIALIZAR FIREBASE ==========
+        const firebaseConfig = {
+          apiKey: "AIzaSyCLHmqR0bDmq7j-q-E0I456DlAgWMIKkgY",
+          authDomain: "fittrack-59829.firebaseapp.com",
+          projectId: "fittrack-59829",
+          storageBucket: "fittrack-59829.firebasestorage.app",
+          messagingSenderId: "384935605390",
+          appId: "1:384935605390:web:2eb5540c6e3031781a85df"
+        };
 
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Elementos
+        const statusCarregando = document.getElementById('status-carregando');
+        const containerAbas = document.getElementById('container-abas');
         const abaLogin = document.getElementById('aba-login');
         const abaCadastro = document.getElementById('aba-cadastro');
         const formLogin = document.getElementById('form-login');
         const formCadastro = document.getElementById('form-cadastro');
         const mensagem = document.getElementById('mensagem');
 
+        // Mostrar interface
+        function mostrarInterface() {
+            statusCarregando.style.display = 'none';
+            containerAbas.style.display = 'flex';
+            formLogin.style.display = 'flex';
+        }
+
+        // Navegação entre abas
         function mostrarAbaLogin() {
             abaLogin.classList.add('ativa');
             abaCadastro.classList.remove('ativa');
@@ -97,24 +128,20 @@
         abaLogin.addEventListener('click', mostrarAbaLogin);
         abaCadastro.addEventListener('click', mostrarAbaCadastro);
 
-        // ✅ Salvar e carregar mapa de usuários usando Firestore diretamente
+        // Carregar mapa de usuários
         async function carregarMapaUsuarios() {
             try {
-                const ref = doc(db, 'config', 'mapa_usuarios');
-                const snap = await getDoc(ref);
-                if (snap.exists()) {
-                    return snap.data();
-                }
+                const doc = await db.collection('config').doc('mapa_usuarios').get();
+                if (doc.exists) return doc.data();
             } catch (e) {
-                console.log('Sem mapa de usuários ainda');
+                console.log('Novo mapa de usuários');
             }
             return {};
         }
 
         async function salvarMapaUsuarios(mapa) {
             try {
-                const ref = doc(db, 'config', 'mapa_usuarios');
-                await setDoc(ref, mapa);
+                await db.collection('config').doc('mapa_usuarios').set(mapa);
             } catch (e) {
                 console.error('Erro ao salvar mapa:', e);
             }
@@ -143,16 +170,13 @@
                 return;
             }
 
-            // Criamos um e-mail "fictício" baseado no nome de usuário
             const emailFicticio = `${usuario}@fittrack-app.com`;
 
             try {
-                // Criar conta no Firebase Auth
-                const userCred = await createUserWithEmailAndPassword(auth, emailFicticio, senha);
+                const userCred = await auth.createUserWithEmailAndPassword(emailFicticio, senha);
                 const uid = userCred.user.uid;
 
-                // Salvar dados do usuário
-                await setDoc(doc(db, 'usuarios', uid), {
+                await db.collection('usuarios').doc(uid).set({
                     nomeCompleto: nome,
                     usuario: usuario,
                     email: emailFicticio,
@@ -160,7 +184,6 @@
                     registros: {}
                 });
 
-                // Atualizar mapa de usuários
                 mapaUsuarios[usuario] = emailFicticio;
                 await salvarMapaUsuarios(mapaUsuarios);
 
@@ -198,7 +221,7 @@
             }
 
             try {
-                await signInWithEmailAndPassword(auth, email, senha);
+                await auth.signInWithEmailAndPassword(email, senha);
                 mensagem.className = 'mensagem sucesso';
                 mensagem.textContent = '✅ Entrando...';
                 setTimeout(() => window.location.href = 'dashboard.html', 800);
@@ -211,6 +234,9 @@
                 }
             }
         });
+
+        // Inicializar
+        mostrarInterface();
     </script>
 </body>
 </html>
