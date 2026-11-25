@@ -54,163 +54,163 @@
         </div>
 
         <form id="form-login" class="form-login">
-    <input type="text" id="login-usuario" placeholder="Seu nome de usuário" required>
-    <input type="password" id="login-senha" placeholder="Sua senha" required>
-    <button type="submit">Entrar</button>
-</form>
+            <input type="text" id="login-usuario" placeholder="Seu nome de usuário" required>
+            <input type="password" id="login-senha" placeholder="Sua senha" required>
+            <button type="submit">Entrar</button>
+        </form>
 
         <form id="form-cadastro" class="form-cadastro">
-    <input type="text" id="cadastro-nome" placeholder="Seu nome completo" required>
-    <input type="text" id="cadastro-usuario" placeholder="Nome de usuário (sem espaços)" required>
-    <input type="password" id="cadastro-senha" placeholder="Criar senha (mínimo 6 dígitos)" required>
-    <button type="submit">Criar Conta</button>
-</form>
-
+            <input type="text" id="cadastro-nome" placeholder="Seu nome completo" required>
+            <input type="text" id="cadastro-usuario" placeholder="Nome de usuário (sem espaços)" required>
+            <input type="password" id="cadastro-senha" placeholder="Criar senha (mínimo 6 dígitos)" required>
+            <button type="submit">Criar Conta</button>
+        </form>
 
         <div id="mensagem" class="mensagem"></div>
     </div>
 
-    import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from './firebase-config.js';
-import { salvarDadosUsuario, carregarDadosUsuario } from './dados-service.js';
+    <script type="module">
+        import { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, doc, setDoc, getDoc } from './firebase-config.js';
 
-const abaLogin = document.getElementById('aba-login');
-const abaCadastro = document.getElementById('aba-cadastro');
-const formLogin = document.getElementById('form-login');
-const formCadastro = document.getElementById('form-cadastro');
-const mensagem = document.getElementById('mensagem');
+        const abaLogin = document.getElementById('aba-login');
+        const abaCadastro = document.getElementById('aba-cadastro');
+        const formLogin = document.getElementById('form-login');
+        const formCadastro = document.getElementById('form-cadastro');
+        const mensagem = document.getElementById('mensagem');
 
-function mostrarAbaLogin() {
-    abaLogin.classList.add('ativa');
-    abaCadastro.classList.remove('ativa');
-    formLogin.style.display = 'flex';
-    formCadastro.style.display = 'none';
-    mensagem.textContent = '';
-}
+        function mostrarAbaLogin() {
+            abaLogin.classList.add('ativa');
+            abaCadastro.classList.remove('ativa');
+            formLogin.style.display = 'flex';
+            formCadastro.style.display = 'none';
+            mensagem.textContent = '';
+        }
 
-function mostrarAbaCadastro() {
-    abaLogin.classList.remove('ativa');
-    abaCadastro.classList.add('ativa');
-    formLogin.style.display = 'none';
-    formCadastro.style.display = 'flex';
-    mensagem.textContent = '';
-}
+        function mostrarAbaCadastro() {
+            abaLogin.classList.remove('ativa');
+            abaCadastro.classList.add('ativa');
+            formLogin.style.display = 'none';
+            formCadastro.style.display = 'flex';
+            mensagem.textContent = '';
+        }
 
-abaLogin.addEventListener('click', mostrarAbaLogin);
-abaCadastro.addEventListener('click', mostrarAbaCadastro);
+        abaLogin.addEventListener('click', mostrarAbaLogin);
+        abaCadastro.addEventListener('click', mostrarAbaCadastro);
 
-// Função para carregar lista de usuários (mapeamento usuário → e-mail)
-async function carregarMapaUsuarios() {
-    try {
-        const resposta = await fetch('https://firestore.googleapis.com/v1/projects/fittrack-xxxxx/databases/(default)/documents/usuarios/_mapausuarios', {
-            method: 'GET'
-        });
-        if (resposta.ok) {
-            const dados = await resposta.json();
-            if (dados.fields && dados.fields.mapa) {
-                return JSON.parse(dados.fields.mapa.stringValue);
+        // ✅ Salvar e carregar mapa de usuários usando Firestore diretamente
+        async function carregarMapaUsuarios() {
+            try {
+                const ref = doc(db, 'config', 'mapa_usuarios');
+                const snap = await getDoc(ref);
+                if (snap.exists()) {
+                    return snap.data();
+                }
+            } catch (e) {
+                console.log('Sem mapa de usuários ainda');
+            }
+            return {};
+        }
+
+        async function salvarMapaUsuarios(mapa) {
+            try {
+                const ref = doc(db, 'config', 'mapa_usuarios');
+                await setDoc(ref, mapa);
+            } catch (e) {
+                console.error('Erro ao salvar mapa:', e);
             }
         }
-    } catch (e) {}
-    return {};
-}
 
-async function salvarMapaUsuarios(mapa) {
-    try {
-        await fetch('https://firestore.googleapis.com/v1/projects/fittrack-xxxxx/databases/(default)/documents/usuarios/_mapausuarios', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                fields: { mapa: { stringValue: JSON.stringify(mapa) } }
-            })
+        // Cadastro
+        formCadastro.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            mensagem.textContent = '';
+            
+            const nome = document.getElementById('cadastro-nome').value.trim();
+            const usuario = document.getElementById('cadastro-usuario').value.trim().toLowerCase();
+            const senha = document.getElementById('cadastro-senha').value;
+
+            if (usuario.includes(' ')) {
+                mensagem.className = 'mensagem erro';
+                mensagem.textContent = '⚠️ Nome de usuário não pode ter espaços';
+                return;
+            }
+
+            const mapaUsuarios = await carregarMapaUsuarios();
+            
+            if (mapaUsuarios[usuario]) {
+                mensagem.className = 'mensagem erro';
+                mensagem.textContent = '⚠️ Este nome de usuário já está em uso';
+                return;
+            }
+
+            // Criamos um e-mail "fictício" baseado no nome de usuário
+            const emailFicticio = `${usuario}@fittrack-app.com`;
+
+            try {
+                // Criar conta no Firebase Auth
+                const userCred = await createUserWithEmailAndPassword(auth, emailFicticio, senha);
+                const uid = userCred.user.uid;
+
+                // Salvar dados do usuário
+                await setDoc(doc(db, 'usuarios', uid), {
+                    nomeCompleto: nome,
+                    usuario: usuario,
+                    email: emailFicticio,
+                    metas: { calorias: 2000, agua: 2500, atividade: 45 },
+                    registros: {}
+                });
+
+                // Atualizar mapa de usuários
+                mapaUsuarios[usuario] = emailFicticio;
+                await salvarMapaUsuarios(mapaUsuarios);
+
+                mensagem.className = 'mensagem sucesso';
+                mensagem.textContent = '✅ Conta criada! Entrando...';
+                setTimeout(() => window.location.href = 'dashboard.html', 1200);
+            } catch (erro) {
+                mensagem.className = 'mensagem erro';
+                console.error(erro);
+                if (erro.code === 'auth/email-already-in-use') {
+                    mensagem.textContent = '⚠️ Este nome de usuário já existe';
+                } else if (erro.code === 'auth/weak-password') {
+                    mensagem.textContent = '⚠️ A senha precisa ter pelo menos 6 caracteres';
+                } else {
+                    mensagem.textContent = '❌ Erro: ' + erro.message;
+                }
+            }
         });
-    } catch (e) {}
-}
 
-// Cadastro
-formCadastro.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    mensagem.textContent = '';
-    
-    const nome = document.getElementById('cadastro-nome').value.trim();
-    const usuario = document.getElementById('cadastro-usuario').value.trim().toLowerCase();
-    const senha = document.getElementById('cadastro-senha').value;
+        // Login
+        formLogin.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            mensagem.textContent = '';
+            
+            const usuario = document.getElementById('login-usuario').value.trim().toLowerCase();
+            const senha = document.getElementById('login-senha').value;
 
-    if (usuario.includes(' ')) {
-        mensagem.className = 'mensagem erro';
-        mensagem.textContent = '⚠️ Nome de usuário não pode ter espaços';
-        return;
-    }
+            const mapaUsuarios = await carregarMapaUsuarios();
+            const email = mapaUsuarios[usuario];
 
-    const mapaUsuarios = await carregarMapaUsuarios();
-    
-    if (mapaUsuarios[usuario]) {
-        mensagem.className = 'mensagem erro';
-        mensagem.textContent = '⚠️ Este nome de usuário já está em uso';
-        return;
-    }
+            if (!email) {
+                mensagem.className = 'mensagem erro';
+                mensagem.textContent = '⚠️ Usuário não encontrado';
+                return;
+            }
 
-    const emailFicticio = `${usuario}@fittrack-local.com`;
-
-    try {
-        const userCred = await createUserWithEmailAndPassword(auth, emailFicticio, senha);
-        
-        await salvarDadosUsuario({
-            nomeCompleto: nome,
-            usuario: usuario,
-            email: emailFicticio,
-            metas: { calorias: 2000, agua: 2500, atividade: 45 },
-            registros: {}
+            try {
+                await signInWithEmailAndPassword(auth, email, senha);
+                mensagem.className = 'mensagem sucesso';
+                mensagem.textContent = '✅ Entrando...';
+                setTimeout(() => window.location.href = 'dashboard.html', 800);
+            } catch (erro) {
+                mensagem.className = 'mensagem erro';
+                if (erro.code === 'auth/user-not-found' || erro.code === 'auth/wrong-password') {
+                    mensagem.textContent = '⚠️ Usuário ou senha incorretos';
+                } else {
+                    mensagem.textContent = '❌ Erro: ' + erro.message;
+                }
+            }
         });
-
-        mapaUsuarios[usuario] = emailFicticio;
-        await salvarMapaUsuarios(mapaUsuarios);
-
-        mensagem.className = 'mensagem sucesso';
-        mensagem.textContent = '✅ Conta criada! Entrando...';
-        setTimeout(() => window.location.href = 'dashboard.html', 1200);
-    } catch (erro) {
-        mensagem.className = 'mensagem erro';
-        if (erro.code === 'auth/email-already-in-use') {
-            mensagem.textContent = '⚠️ Este nome de usuário já existe';
-        } else if (erro.code === 'auth/weak-password') {
-            mensagem.textContent = '⚠️ A senha precisa ter pelo menos 6 caracteres';
-        } else {
-            mensagem.textContent = '❌ Erro: ' + erro.message;
-        }
-    }
-});
-
-// Login
-formLogin.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    mensagem.textContent = '';
-    
-    const usuario = document.getElementById('login-usuario').value.trim().toLowerCase();
-    const senha = document.getElementById('login-senha').value;
-
-    const mapaUsuarios = await carregarMapaUsuarios();
-    const email = mapaUsuarios[usuario];
-
-    if (!email) {
-        mensagem.className = 'mensagem erro';
-        mensagem.textContent = '⚠️ Usuário não encontrado';
-        return;
-    }
-
-    try {
-        await signInWithEmailAndPassword(auth, email, senha);
-        mensagem.className = 'mensagem sucesso';
-        mensagem.textContent = '✅ Entrando...';
-        setTimeout(() => window.location.href = 'dashboard.html', 800);
-    } catch (erro) {
-        mensagem.className = 'mensagem erro';
-        if (erro.code === 'auth/user-not-found' || erro.code === 'auth/wrong-password') {
-            mensagem.textContent = '⚠️ Usuário ou senha incorretos';
-        } else {
-            mensagem.textContent = '❌ Erro: ' + erro.message;
-        }
-    }
-});
     </script>
 </body>
 </html>
