@@ -1,26 +1,18 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-
-const firebaseConfig = {
-    apiKey: "AIzaSyCLHmqR0bDmq7j-q-E0I456DlAgWMIKkgY",
-    authDomain: "fittrack-59829.firebaseapp.com",
-    projectId: "fittrack-59829",
-    storageBucket: "fittrack-59829.firebasestorage.app",
-    messagingSenderId: "384935605390",
-    appId: "1:384935605390:web:2eb5540c6e3031781a85df"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
 document.addEventListener('DOMContentLoaded', async function() {
+
+    if (typeof firebase === 'undefined') {
+        console.error('❌ Firebase não carregou! Verifique a ordem das tags <script> no HTML.');
+        alert('Erro de carregamento. Atualize a página.');
+        return;
+    }
+
+    const db = firebase.firestore();
+
     const usuarioId = localStorage.getItem('fittrack_usuario_atual');
     if (!usuarioId) {
         window.location.href = 'index.html';
         return;
     }
-
-    const userDocRef = doc(db, 'usuarios', usuarioId);
 
     let dadosUsuario = null;
     let dataSelecionada = formatarDataLocal(new Date());
@@ -43,48 +35,43 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     async function salvar() {
         try {
-            await setDoc(userDocRef, dadosUsuario);
-            console.log('✅ SALVO!', dadosUsuario);
+            await db.collection('usuarios').doc(usuarioId).set(dadosUsuario);
+            console.log('✅ SALVO!', dadosUsuario.metas);
             return true;
         } catch (e) {
             console.error('❌ ERRO AO SALVAR:', e);
-            alert('Erro ao salvar: ' + e.message);
+            alert('Erro: ' + e.message);
             return false;
         }
     }
 
     async function carregar() {
-        try {
-            console.log('📂 Carregando...');
-            const docSnap = await getDoc(userDocRef);
+        console.log('📂 Carregando...');
+        const doc = await db.collection('usuarios').doc(usuarioId).get();
 
-            if (!docSnap.exists()) {
-                console.error('❌ Documento não encontrado!');
-                alert('Usuário não encontrado. Faça login novamente.');
-                localStorage.removeItem('fittrack_usuario_atual');
-                window.location.href = 'index.html';
-                return;
-            }
-
-            dadosUsuario = docSnap.data();
-            console.log('✅ CARREGADO!', dadosUsuario);
-
-            if (!dadosUsuario.metas) dadosUsuario.metas = { calorias: 2000, agua: 2500, atividade: 45 };
-            if (!dadosUsuario.registros) dadosUsuario.registros = {};
-
-            const nome = dadosUsuario.nomeCompleto?.split(' ')[0] || dadosUsuario.usuario || 'Usuário';
-            document.getElementById('saudacao-usuario').textContent = `Olá, ${nome}!`;
-
-            document.getElementById('meta-calorias').value = dadosUsuario.metas.calorias;
-            document.getElementById('meta-agua').value = dadosUsuario.metas.agua;
-            document.getElementById('meta-atividade').value = dadosUsuario.metas.atividade;
-
-            renderizarCalendario();
-            atualizarPainel();
-        } catch (e) {
-            console.error('❌ ERRO AO CARREGAR:', e);
-            alert('Erro ao carregar dados: ' + e.message);
+        if (!doc.exists) {
+            console.error('❌ Documento não encontrado!');
+            alert('Usuário não encontrado. Faça login novamente.');
+            localStorage.removeItem('fittrack_usuario_atual');
+            window.location.href = 'index.html';
+            return;
         }
+
+        dadosUsuario = doc.data();
+        console.log('✅ CARREGADO!', dadosUsuario);
+
+        if (!dadosUsuario.metas) dadosUsuario.metas = { calorias: 2000, agua: 2500, atividade: 45 };
+        if (!dadosUsuario.registros) dadosUsuario.registros = {};
+
+        const nome = dadosUsuario.nomeCompleto?.split(' ')[0] || dadosUsuario.usuario || 'Usuário';
+        document.getElementById('saudacao-usuario').textContent = `Olá, ${nome}!`;
+
+        document.getElementById('meta-calorias').value = dadosUsuario.metas.calorias;
+        document.getElementById('meta-agua').value = dadosUsuario.metas.agua;
+        document.getElementById('meta-atividade').value = dadosUsuario.metas.atividade;
+
+        renderizarCalendario();
+        atualizarPainel();
     }
 
     function garantirRegistroDia() {
@@ -96,84 +83,18 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!dadosUsuario.registros[dataSelecionada].atividade) dadosUsuario.registros[dataSelecionada].atividade = [];
     }
 
-    // Atualizar Metas
     document.getElementById('form-metas').addEventListener('submit', async function(e) {
         e.preventDefault();
-        if (!dadosUsuario) return;
 
         dadosUsuario.metas.calorias = Number(document.getElementById('meta-calorias').value);
         dadosUsuario.metas.agua = Number(document.getElementById('meta-agua').value);
         dadosUsuario.metas.atividade = Number(document.getElementById('meta-atividade').value);
 
-        const ok = await salvar();
-        if (ok) {
-            atualizarPainel();
-            alert('✅ Metas salvas!');
-        }
-    });
-
-    // Adicionar Calorias e Refeições
-    document.getElementById('form-calorias').addEventListener('submit', async e => {
-        e.preventDefault();
-        if (!dadosUsuario) return;
-
-        const ref = document.getElementById('refeicao-nome').value;
-        const ali = document.getElementById('alimento-nome').value;
-        const gramas = Number(document.getElementById('alimento-gramas').value);
-        const kcal = Number(document.getElementById('alimento-kcal').value);
-
-        garantirRegistroDia();
-        dadosUsuario.registros[dataSelecionada].calorias.push({
-            refeicao: ref,
-            alimento: ali,
-            gramas: gramas,
-            kcal: kcal
-        });
-
         await salvar();
         atualizarPainel();
-        document.getElementById('form-calorias').reset();
+        alert('✅ Metas salvas!');
     });
 
-    // Atalhos de Água
-    document.querySelectorAll('.btn-agua-rapido').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            if (!dadosUsuario) return;
-            const ml = Number(btn.dataset.ml);
-            garantirRegistroDia();
-            dadosUsuario.registros[dataSelecionada].agua.push({ descricao: 'Copo', valor: ml });
-            await salvar();
-            atualizarPainel();
-        });
-    });
-
-    // Adicionar Água Personalizada
-    document.getElementById('form-agua').addEventListener('submit', async e => {
-        e.preventDefault();
-        if (!dadosUsuario) return;
-        const ml = Number(document.getElementById('valor-agua').value);
-        garantirRegistroDia();
-        dadosUsuario.registros[dataSelecionada].agua.push({ descricao: 'Personalizado', valor: ml });
-        await salvar();
-        atualizarPainel();
-        document.getElementById('valor-agua').value = '';
-    });
-
-    // Adicionar Atividade Física
-    document.getElementById('form-atividade').addEventListener('submit', async e => {
-        e.preventDefault();
-        if (!dadosUsuario) return;
-        const nome = document.getElementById('desc-atividade').value;
-        const min = Number(document.getElementById('valor-atividade').value);
-        garantirRegistroDia();
-        dadosUsuario.registros[dataSelecionada].atividade.push({ descricao: nome, valor: min });
-        await salvar();
-        atualizarPainel();
-        document.getElementById('desc-atividade').value = '';
-        document.getElementById('valor-atividade').value = '';
-    });
-
-    // Atualizar Barras e Listas na Tela
     function atualizarPainel() {
         if (!dadosUsuario) return;
 
@@ -192,7 +113,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('barra-agua').style.width = `${Math.min((totalAgua / dadosUsuario.metas.agua) * 100, 100)}%`;
         document.getElementById('barra-atividade').style.width = `${Math.min((totalAtv / dadosUsuario.metas.atividade) * 100, 100)}%`;
 
-        // Renderizar Lista de Refeições
+        // Renderizar Refeições
         const listaRefeicoes = document.getElementById('lista-refeicoes');
         listaRefeicoes.innerHTML = '';
         reg.calorias.forEach((item, index) => {
@@ -206,7 +127,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             listaRefeicoes.appendChild(div);
         });
 
-        // Renderizar Lista de Água
+        // Renderizar Água
         const listaAgua = document.getElementById('lista-agua');
         listaAgua.innerHTML = '';
         reg.agua.forEach((item, index) => {
@@ -218,7 +139,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             listaAgua.appendChild(li);
         });
 
-        // Renderizar Lista de Atividades
+        // Renderizar Atividades
         const listaAtividade = document.getElementById('lista-atividade');
         listaAtividade.innerHTML = '';
         reg.atividade.forEach((item, index) => {
@@ -230,26 +151,82 @@ document.addEventListener('DOMContentLoaded', async function() {
             listaAtividade.appendChild(li);
         });
 
-        // Eventos para remover itens
+        // Remover itens
         document.querySelectorAll('.btn-remover').forEach(btn => {
-btn.addEventListener('click', async () => {
-const tipo = btn.dataset.tipo;
-const index = Number(btn.dataset.index);
-dadosUsuario.registros[dataSelecionada][tipo].splice(index, 1);
-await salvar();
-atualizarPainel();
-});
-});
-}
-// Calendário
-function renderizarCalendario() {
-const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-document.getElementById('mes-ano-atual').textContent = ${meses[mesAtual]} ${anoAtual};
-const grade = document.getElementById('grade-dias');
-grade.innerHTML = '';
-const primeiroDia = new Date(anoAtual, mesAtual, 1).getDay();
-const ultimoDia = new Date(anoAtual, mesAtual + 1, 0).getDate();
-const hojeISO = formatarDataLocal(new Date());
+            btn.addEventListener('click', async () => {
+                const tipo = btn.dataset.tipo;
+                const index = Number(btn.dataset.index);
+                dadosUsuario.registros[dataSelecionada][tipo].splice(index, 1);
+                await salvar();
+                atualizarPainel();
+            });
+        });
+    }
+
+    document.getElementById('form-calorias').addEventListener('submit', async e => {
+        e.preventDefault();
+        const ref = document.getElementById('refeicao-nome').value;
+        const ali = document.getElementById('alimento-nome').value;
+        const gramas = Number(document.getElementById('alimento-gramas').value);
+        const kcal = Number(document.getElementById('alimento-kcal').value);
+
+        garantirRegistroDia();
+        dadosUsuario.registros[dataSelecionada].calorias.push({
+            refeicao: ref,
+            alimento: ali,
+            gramas: gramas,
+            kcal: kcal
+        });
+
+        await salvar();
+        atualizarPainel();
+        document.getElementById('form-calorias').reset();
+    });
+
+    document.querySelectorAll('.btn-agua-rapido').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const ml = Number(btn.dataset.ml);
+            garantirRegistroDia();
+            dadosUsuario.registros[dataSelecionada].agua.push({ descricao: 'Copo', valor: ml });
+            await salvar();
+            atualizarPainel();
+        });
+    });
+
+    document.getElementById('form-agua').addEventListener('submit', async e => {
+        e.preventDefault();
+        const ml = Number(document.getElementById('valor-agua').value);
+        garantirRegistroDia();
+        dadosUsuario.registros[dataSelecionada].agua.push({ descricao: 'Personalizado', valor: ml });
+        await salvar();
+        atualizarPainel();
+        document.getElementById('valor-agua').value = '';
+    });
+
+    document.getElementById('form-atividade').addEventListener('submit', async e => {
+        e.preventDefault();
+        const nome = document.getElementById('desc-atividade').value;
+        const min = Number(document.getElementById('valor-atividade').value);
+        garantirRegistroDia();
+        dadosUsuario.registros[dataSelecionada].atividade.push({ descricao: nome, valor: min });
+        await salvar();
+        atualizarPainel();
+        document.getElementById('desc-atividade').value = '';
+        document.getElementById('valor-atividade').value = '';
+    });
+
+    // Calendário
+    function renderizarCalendario() {
+        const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+        document.getElementById('mes-ano-atual').textContent = `${meses[mesAtual]} ${anoAtual}`;
+
+        const grade = document.getElementById('grade-dias');
+        grade.innerHTML = '';
+
+        const primeiroDia = new Date(anoAtual, mesAtual, 1).getDay();
+        const ultimoDia = new Date(anoAtual, mesAtual + 1, 0).getDate();
+        const hojeISO = formatarDataLocal(new Date());
+
 for (let i = 0; i < primeiroDia; i++) {
 grade.appendChild(document.createElement('span'));
 }
@@ -284,7 +261,6 @@ anoAtual++;
 }
 renderizarCalendario();
 });
-// Sair
 document.getElementById('btn-sair').addEventListener('click', () => {
 localStorage.removeItem('fittrack_usuario_atual');
 window.location.href = 'index.html';
