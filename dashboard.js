@@ -1,4 +1,3 @@
-// dashboard.js — Versão ajustada para seu HTML
 let usuarioAtual = null;
 let dadosUsuario = null;
 let dataSelecionada = formatarDataISO(new Date());
@@ -6,7 +5,9 @@ let dataSelecionada = formatarDataISO(new Date());
 // ============= INICIALIZAÇÃO =============
 async function iniciar() {
     try {
-        // Aguardar login
+        console.log('🚀 Iniciando FitTrack...');
+        
+        // Aguardar usuário logado
         usuarioAtual = await new Promise(resolve => {
             const unsubscribe = firebase.auth().onAuthStateChanged(user => {
                 unsubscribe();
@@ -21,59 +22,62 @@ async function iniciar() {
 
         // Saudação
         const primeiroNome = usuarioAtual.email.split('@')[0];
-        const elSaudacao = document.querySelector('.saudacao-usuario, [class*="olá"], h1');
-        if (elSaudacao) elSaudacao.textContent = `Olá, ${primeiroNome}`;
+        const elSaudacao = document.getElementById('saudacao-usuario');
+        if (elSaudacao) elSaudacao.textContent = `Olá, ${primeiroNome}!`;
 
         // Carregar dados do Firestore
-        const docSnap = await firebase.firestore().collection('usuarios').doc(usuarioAtual.uid).get();
+        const docSnap = await firebase.firestore()
+            .collection('usuarios')
+            .doc(usuarioAtual.uid)
+            .get();
         
         if (docSnap.exists) {
             dadosUsuario = docSnap.data();
+            console.log('✅ Dados carregados do Firestore');
         } else {
             dadosUsuario = {
-                nomeCompleto: '',
-                usuario: '',
                 metas: { calorias: 2000, agua: 2500, atividade: 45 },
                 registros: {}
             };
+            console.log('📋 Dados padrão criados');
         }
 
         if (!dadosUsuario.metas) dadosUsuario.metas = { calorias: 2000, agua: 2500, atividade: 45 };
         if (!dadosUsuario.registros) dadosUsuario.registros = {};
 
         // Botão Sair
-        const btnSair = document.querySelector('.btn-sair, button:contains("Sair")');
+        const btnSair = document.getElementById('btn-sair');
         if (btnSair) btnSair.addEventListener('click', async () => {
             await firebase.auth().signOut();
             window.location.href = 'index.html';
         });
 
-        carregarValoresNaTela();
+        carregarMetasNosInputs();
         renderizarCalendario();
         atualizarPainelDoDia();
+        vincularEventosFormularios();
         
-        // Botão Atualizar Metas
-        const btnAtualizarMetas = document.querySelector('button:contains("Atualizar Metas")');
-        if (btnAtualizarMetas) {
-            btnAtualizarMetas.addEventListener('click', salvarMetas);
-        }
-
-        // Formulários
-        vincularFormularios();
-        
+        console.log('🎉 Pronto para usar!');
     } catch (erro) {
-        console.error('Erro ao inicializar:', erro);
+        console.error('❌ Erro ao inicializar:', erro);
+        alert('Erro ao carregar dados: ' + erro.message);
     }
 }
 
-// ============= SALVAR NO FIREBASE =============
-async function salvar() {
+// ============= SALVAR DADOS NO FIREBASE =============
+async function salvarDados() {
     if (!usuarioAtual) return;
     try {
-        await firebase.firestore().collection('usuarios').doc(usuarioAtual.uid).set(dadosUsuario, { merge: true });
-        console.log('✅ Dados salvos!');
+        await firebase.firestore()
+            .collection('usuarios')
+            .doc(usuarioAtual.uid)
+            .set(dadosUsuario, { merge: true });
+        console.log('💾 Dados salvos com sucesso!');
+        return true;
     } catch (erro) {
         console.error('❌ Erro ao salvar:', erro);
+        alert('Erro ao salvar: ' + erro.message);
+        return false;
     }
 }
 
@@ -97,187 +101,276 @@ function obterRegistrosDoDia(dataISO) {
     return dadosUsuario.registros[dataISO];
 }
 
-// ============= CARREGAR VALORES NA TELA =============
-function carregarValoresNaTela() {
-    // Metas
-    const inputMetaCal = document.querySelector('input[placeholder*="Calorias"], input[placeholder*="calorias"]');
-    const inputMetaAgua = document.querySelector('input[placeholder*="Água"], input[placeholder*="água"]');
-    const inputMetaAtiv = document.querySelector('input[placeholder*="Atividade"], input[placeholder*="Física"]');
+// ============= CARREGAR METAS NOS CAMPOS =============
+function carregarMetasNosInputs() {
+    const inputCal = document.getElementById('meta-calorias');
+    const inputAgua = document.getElementById('meta-agua');
+    const inputAtv = document.getElementById('meta-atividade');
 
-    if (inputMetaCal) inputMetaCal.value = dadosUsuario.metas.calorias;
-    if (inputMetaAgua) inputMetaAgua.value = dadosUsuario.metas.agua;
-    if (inputMetaAtiv) inputMetaAtiv.value = dadosUsuario.metas.atividade;
+    if (inputCal) inputCal.value = dadosUsuario.metas.calorias;
+    if (inputAgua) inputAgua.value = dadosUsuario.metas.agua;
+    if (inputAtv) inputAtv.value = dadosUsuario.metas.atividade;
 }
 
 // ============= SALVAR METAS =============
-async function salvarMetas() {
-    const inputMetaCal = document.querySelector('input[placeholder*="Calorias"], input[placeholder*="calorias"]');
-    const inputMetaAgua = document.querySelector('input[placeholder*="Água"], input[placeholder*="água"]');
-    const inputMetaAtiv = document.querySelector('input[placeholder*="Atividade"], input[placeholder*="Física"]');
-
-    if (inputMetaCal && Number(inputMetaCal.value) > 0) {
-        dadosUsuario.metas.calorias = Number(inputMetaCal.value);
-    }
-    if (inputMetaAgua && Number(inputMetaAgua.value) > 0) {
-        dadosUsuario.metas.agua = Number(inputMetaAgua.value);
-    }
-    if (inputMetaAtiv && Number(inputMetaAtiv.value) > 0) {
-        dadosUsuario.metas.atividade = Number(inputMetaAtiv.value);
-    }
-
-    await salvar();
-    atualizarPainelDoDia();
-    alert('✅ Metas atualizadas!');
+const formMetas = document.getElementById('form-metas');
+if (formMetas) {
+    formMetas.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const cal = Number(document.getElementById('meta-calorias').value);
+        const agua = Number(document.getElementById('meta-agua').value);
+        const atv = Number(document.getElementById('meta-atividade').value);
+        
+        if (cal > 0) dadosUsuario.metas.calorias = cal;
+        if (agua > 0) dadosUsuario.metas.agua = agua;
+        if (atv > 0) dadosUsuario.metas.atividade = atv;
+        
+        await salvarDados();
+        atualizarPainelDoDia();
+        alert('✅ Metas salvas!');
+    });
 }
 
 // ============= CALENDÁRIO =============
+let dataAtual = new Date();
+
 function renderizarCalendario() {
-    const container = document.querySelector('.dias-semana, .calendario, [class*="dom"], [class*="seg"]');
+    const container = document.getElementById('grade-dias');
+    const mesAnoTexto = document.getElementById('mes-ano-atual');
     if (!container) return;
     
     container.innerHTML = '';
 
+    const nomeMeses = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    mesAnoTexto.textContent = `${nomeMeses[dataAtual.getMonth()]} ${dataAtual.getFullYear()}`;
+
+    const primeiroDia = new Date(dataAtual.getFullYear(), dataAtual.getMonth(), 1);
+    const ultimoDia = new Date(dataAtual.getFullYear(), dataAtual.getMonth() + 1, 0);
+    const diaSemanaInicio = primeiroDia.getDay();
+    const totalDias = ultimoDia.getDate();
     const hoje = new Date();
-    const inicioSemana = new Date(hoje);
-    inicioSemana.setDate(hoje.getDate() - hoje.getDay());
+    const hojeISO = formatarDataISO(hoje);
 
-    const nomesDias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    // Dias vazios antes do mês começar
+    for (let i = 0; i < diaSemanaInicio; i++) {
+        const vazio = document.createElement('div');
+        vazio.className = 'dia-vazio';
+        container.appendChild(vazio);
+    }
 
-    for (let i = 0; i < 7; i++) {
-        const data = new Date(inicioSemana);
-        data.setDate(inicioSemana.getDate() + i);
+    // Dias do mês
+    for (let dia = 1; dia <= totalDias; dia++) {
+        const data = new Date(dataAtual.getFullYear(), dataAtual.getMonth(), dia);
         const dataISO = formatarDataISO(data);
-        const diaMes = data.getDate();
+        const reg = dadosUsuario.registros[dataISO] || { calorias: [], agua: [], atividade: [] };
+        
+        const totalCal = reg.calorias.reduce((s, i) => s + Number(i.kcal || 0), 0);
+        const totalAgua = reg.agua.reduce((s, i) => s + Number(i.ml || i.valor || 0), 0);
+        const totalAtv = reg.atividade.reduce((s, i) => s + Number(i.min || i.valor || 0), 0);
+        
+        const calOk = totalCal > 0 && totalCal <= dadosUsuario.metas.calorias;
+        const agOk = totalAgua >= dadosUsuario.metas.agua * 0.8;
+        const atOk = totalAtv >= dadosUsuario.metas.atividade;
+        const concluidas = [calOk, agOk, atOk].filter(Boolean).length;
 
-        const ehHoje = dataISO === formatarDataISO(hoje) ? 'dia-hoje' : '';
+        let classeStatus = '';
+        if (concluidas === 3) classeStatus = 'meta-completa';
+        else if (concluidas > 0) classeStatus = 'meta-parcial';
+
+        const ehHoje = dataISO === hojeISO ? 'dia-hoje' : '';
         const ehSelecionado = dataISO === dataSelecionada ? 'dia-selecionado' : '';
 
-        const div = document.createElement('div');
-        div.className = `dia-semana ${ehHoje} ${ehSelecionado}`;
-        div.innerHTML = `
-            <div style="font-size:12px;color:#888;">${nomesDias[i]}</div>
-            <div style="font-weight:bold;">${diaMes}</div>
-        `;
+        const div = document.createElement('button');
+        div.type = 'button';
+        div.className = `dia-mes ${ehHoje} ${ehSelecionado} ${classeStatus}`;
+        div.textContent = dia;
         div.addEventListener('click', () => {
             dataSelecionada = dataISO;
-            renderizarCalendario();
             atualizarPainelDoDia();
+            // Atualizar seleção visual
+            document.querySelectorAll('.dia-mes').forEach(d => d.classList.remove('dia-selecionado'));
+            div.classList.add('dia-selecionado');
+            document.getElementById('data-selecionada-texto').textContent = formatarDataBr(dataISO);
         });
         container.appendChild(div);
     }
 }
 
-// ============= PAINEL DO DIA =============
+// Navegação do mês
+const btnMesAnterior = document.getElementById('mes-anterior');
+const btnProximoMes = document.getElementById('proximo-mes');
+if (btnMesAnterior) btnMesAnterior.addEventListener('click', () => {
+    dataAtual.setMonth(dataAtual.getMonth() - 1);
+    renderizarCalendario();
+});
+if (btnProximoMes) btnProximoMes.addEventListener('click', () => {
+    dataAtual.setMonth(dataAtual.getMonth() + 1);
+    renderizarCalendario();
+});
+
+// ============= ATUALIZAR PAINEL DO DIA =============
 function atualizarPainelDoDia() {
     const reg = obterRegistrosDoDia(dataSelecionada);
 
     // Totais
     const totalCal = reg.calorias.reduce((s, i) => s + Number(i.kcal || 0), 0);
-    const totalAgua = reg.agua.reduce((s, i) => s + Number(i.valor || 0), 0);
-    const totalAtiv = reg.atividade.reduce((s, i) => s + Number(i.valor || 0), 0);
+    const totalAgua = reg.agua.reduce((s, i) => s + Number(i.ml || i.valor || 0), 0);
+    const totalAtiv = reg.atividade.reduce((s, i) => s + Number(i.min || i.valor || 0), 0);
 
     // Atualizar textos
-    const elCal = document.querySelector('div:contains("/ kcal"), span:contains("/ kcal")');
-    const elAgua = document.querySelector('div:contains("/ ml"), span:contains("/ ml")');
-    const elAtiv = document.querySelector('div:contains("/ min"), span:contains("/ min")');
+    const elStatusCal = document.getElementById('status-calorias');
+    const elStatusAgua = document.getElementById('status-agua');
+    const elStatusAtiv = document.getElementById('status-atividade');
+    
+    if (elStatusCal) elStatusCal.textContent = `${totalCal} / ${dadosUsuario.metas.calorias} kcal`;
+    if (elStatusAgua) elStatusAgua.textContent = `${totalAgua} / ${dadosUsuario.metas.agua} ml`;
+    if (elStatusAtiv) elStatusAtiv.textContent = `${totalAtiv} / ${dadosUsuario.metas.atividade} min`;
 
-    if (elCal) elCal.innerHTML = `${totalCal} / ${dadosUsuario.metas.calorias} kcal`;
-    if (elAgua) elAgua.innerHTML = `${totalAgua} / ${dadosUsuario.metas.agua} ml`;
-    if (elAtiv) elAtiv.innerHTML = `${totalAtiv} / ${dadosUsuario.metas.atividade} min`;
+    // Barras de progresso
+    const barraCal = document.getElementById('barra-calorias');
+    const barraAgua = document.getElementById('barra-agua');
+    const barraAtiv = document.getElementById('barra-atividade');
+    
+    if (barraCal) barraCal.style.width = `${Math.min((totalCal / dadosUsuario.metas.calorias) * 100, 100)}%`;
+    if (barraAgua) barraAgua.style.width = `${Math.min((totalAgua / dadosUsuario.metas.agua) * 100, 100)}%`;
+    if (barraAtiv) barraAtiv.style.width = `${Math.min((totalAtiv / dadosUsuario.metas.atividade) * 100, 100)}%`;
+
+    // Listas
+    const listaRef = document.getElementById('lista-refeicoes');
+    const listaAgua = document.getElementById('lista-agua');
+    const listaAtiv = document.getElementById('lista-atividade');
+
+    if (listaRef) {
+        listaRef.innerHTML = '';
+        reg.calorias.forEach((item, idx) => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span>${item.nome} — ${item.kcal} kcal</span>
+                <button data-tipo="calorias" data-idx="${idx}" class="btn-excluir">×</button>
+            `;
+            listaRef.appendChild(li);
+        });
+    }
+
+    if (listaAgua) {
+        listaAgua.innerHTML = '';
+        reg.agua.forEach((item, idx) => {
+            const valor = item.ml || item.valor;
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span>${valor} ml</span>
+                <button data-tipo="agua" data-idx="${idx}" class="btn-excluir">×</button>
+            `;
+            listaAgua.appendChild(li);
+        });
+    }
+
+    if (listaAtiv) {
+        listaAtiv.innerHTML = '';
+        reg.atividade.forEach((item, idx) => {
+            const valor = item.min || item.valor;
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span>${item.nome} — ${valor} min</span>
+                <button data-tipo="atividade" data-idx="${idx}" class="btn-excluir">×</button>
+            `;
+            listaAtiv.appendChild(li);
+        });
+    }
 }
 
 // ============= VINCULAR FORMULÁRIOS =============
-function vincularFormularios() {
+function vincularEventosFormularios() {
     // ==== REFEIÇÕES / CALORIAS ====
-    const btnAddRefeicao = document.querySelector('button:contains("+"), button img[alt*="+"]');
-    if (btnAddRefeicao) {
-        btnAddRefeicao.addEventListener('click', async () => {
-            const nomeRef = document.querySelector('input[placeholder*="Refeição"], input[placeholder*="Ex: Almoço"]');
-            const nomeAlim = document.querySelector('input[placeholder*="Alimento"], input[placeholder*="Ex: Arroz"]');
-            const gramas = document.querySelector('input[placeholder*="Gramas"]');
-            const kcal = document.querySelector('input[placeholder*="Calorias (kcal)"]');
-
-            if (!nomeRef || !nomeAlim || !kcal) return;
+    const formCalorias = document.getElementById('form-calorias');
+    if (formCalorias) {
+        formCalorias.addEventListener('submit', async function(e) {
+            e.preventDefault();
             
-            const nome = `${nomeRef.value.trim()} - ${nomeAlim.value.trim()}`;
-            const valorKcal = Number(kcal.value);
-
-            if (nome && valorKcal > 0) {
+            const nomeRef = document.getElementById('refeicao-nome').value.trim();
+            const nomeAlim = document.getElementById('alimento-nome').value.trim();
+            const gramas = document.getElementById('alimento-gramas').value;
+            const kcal = Number(document.getElementById('alimento-kcal').value);
+            
+            if (nomeRef && kcal > 0) {
                 const reg = obterRegistrosDoDia(dataSelecionada);
-                reg.calorias.push({ nome: nome, kcal: valorKcal });
-                await salvar();
+                reg.calorias.push({ 
+                    nome: `${nomeRef}${nomeAlim ? ' — ' + nomeAlim : ''} (${gramas}g)`, 
+                    kcal: kcal 
+                });
+                await salvarDados();
                 atualizarPainelDoDia();
-                
-                // Limpar campos
-                if (nomeRef) nomeRef.value = '';
-                if (nomeAlim) nomeAlim.value = '';
-                if (gramas) gramas.value = '';
-                if (kcal) kcal.value = '';
+                renderizarCalendario();
+                formCalorias.reset();
             }
         });
     }
 
-    // ==== ÁGUA ====
-    const btn250 = document.querySelector('button:contains("+ 250ml")');
-    const btn500 = document.querySelector('button:contains("+ 500ml")');
-    const btnOutraAgua = document.querySelector('button[style*="background:green"], button:contains("✓")');
-    const inputOutraAgua = document.querySelector('input[placeholder*="Outra qtd"]');
-
-    if (btn250) {
-        btn250.addEventListener('click', async () => {
+    // ==== ÁGUA — Botões rápidos ====
+    document.querySelectorAll('.btn-agua-rapido').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const ml = Number(this.dataset.ml);
             const reg = obterRegistrosDoDia(dataSelecionada);
-            reg.agua.push({ valor: 250 });
-            await salvar();
+            reg.agua.push({ ml: ml });
+            await salvarDados();
             atualizarPainelDoDia();
+            renderizarCalendario();
         });
-    }
+    });
 
-    if (btn500) {
-        btn500.addEventListener('click', async () => {
-            const reg = obterRegistrosDoDia(dataSelecionada);
-            reg.agua.push({ valor: 500 });
-            await salvar();
-            atualizarPainelDoDia();
-        });
-    }
-
-    if (btnOutraAgua && inputOutraAgua) {
-        btnOutraAgua.addEventListener('click', async () => {
-            const valor = Number(inputOutraAgua.value);
-            if (valor > 0) {
+    // ==== ÁGUA — Formulário personalizado ====
+    const formAgua = document.getElementById('form-agua');
+    if (formAgua) {
+        formAgua.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const ml = Number(document.getElementById('valor-agua').value);
+            if (ml > 0) {
                 const reg = obterRegistrosDoDia(dataSelecionada);
-                reg.agua.push({ valor: valor });
-                await salvar();
+                reg.agua.push({ ml: ml });
+                await salvarDados();
                 atualizarPainelDoDia();
-                inputOutraAgua.value = '';
+                renderizarCalendario();
+                formAgua.reset();
             }
         });
     }
 
     // ==== ATIVIDADE FÍSICA ====
-    const btnAddAtiv = document.querySelector('.atividade button:contains("+"), button:has(+ input[placeholder*="Minutos"]) + button');
-    if (btnAddAtiv) {
-        btnAddAtiv.addEventListener('click', async () => {
-            const nomeAtiv = document.querySelector('input[placeholder*="Ex: Corrida"]');
-            const minutos = document.querySelector('input[placeholder*="Minutos"]');
-
-            if (nomeAtiv && minutos) {
-                const nome = nomeAtiv.value.trim();
-                const valorMin = Number(minutos.value);
-
-                if (nome && valorMin > 0) {
-                    const reg = obterRegistrosDoDia(dataSelecionada);
-                    reg.atividade.push({ nome: nome, valor: valorMin });
-                    await salvar();
-                    atualizarPainelDoDia();
-                    
-                    nomeAtiv.value = '';
-                    minutos.value = '';
-                }
+    const formAtividade = document.getElementById('form-atividade');
+    if (formAtividade) {
+        formAtividade.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const nome = document.getElementById('desc-atividade').value.trim();
+            const minutos = Number(document.getElementById('valor-atividade').value);
+            
+            if (nome && minutos > 0) {
+                const reg = obterRegistrosDoDia(dataSelecionada);
+                reg.atividade.push({ nome: nome, min: minutos });
+                await salvarDados();
+                atualizarPainelDoDia();
+                renderizarCalendario();
+                formAtividade.reset();
             }
         });
     }
+
+    // ==== EXCLUIR ITENS ====
+    document.addEventListener('click', async function(e) {
+        if (e.target.classList.contains('btn-excluir')) {
+            const tipo = e.target.dataset.tipo;
+            const idx = Number(e.target.dataset.idx);
+            const reg = obterRegistrosDoDia(dataSelecionada);
+            reg[tipo].splice(idx, 1);
+            await salvarDados();
+            atualizarPainelDoDia();
+            renderizarCalendario();
+        }
+    });
 }
 
-// Iniciar quando a página carregar
+// Iniciar quando a página estiver pronta
 document.addEventListener('DOMContentLoaded', iniciar);
