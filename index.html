@@ -1,86 +1,41 @@
-// Configuração do Firebase
-const firebaseConfig = {
-  apiKey: "AIzaSyCLHmqR0bDmq7j-q-E0I456DlAgWMIKkgY",
-  authDomain: "fittrack-59829.firebaseapp.com",
-  projectId: "fittrack-59829",
-  storageBucket: "fittrack-59829.firebasestorage.app",
-  messagingSenderId: "384935605390",
-  appId: "1:384935605390:web:2eb5540c6e3031781a85df"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitTrack - Login</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <main class="auth-container">
+        <div class="auth-card">
+            <header class="auth-header">
+                <h1>FitTrack</h1>
+                <p>Entre com seu usuário para acompanhar suas metas</p>
+            </header>
 
-// --- LOGIN ---
-document.getElementById('form-login').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const usuario = document.getElementById('usuario-login').value.trim();
-    const senha = document.getElementById('senha-login').value;
-    const aviso = document.getElementById('aviso-login');
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="usuario">Nome de Usuário</label>
+                    <input type="text" id="usuario" placeholder="Digite seu usuário" required>
+                </div>
 
-    try {
-        const snapshot = await db.collection('usuarios')
-            .where('usuario', '==', usuario)
-            .get();
+                <div class="input-group">
+                    <label for="senha">Senha</label>
+                    <input type="password" id="senha" placeholder="Digite sua senha" required>
+                </div>
 
-        if (snapshot.empty) {
-            aviso.textContent = '⚠️ Usuário não encontrado';
-            return;
-        }
+                <p id="mensagem-erro" class="erro-texto"></p>
 
-        const doc = snapshot.docs[0];
-        const dados = doc.data();
+                <button type="submit" class="btn-principal">Entrar</button>
+            </form>
 
-        if (dados.senha !== senha) {
-            aviso.textContent = '⚠️ Senha incorreta';
-            return;
-        }
+            <footer class="auth-footer">
+                <p>Ainda não tem conta? <a href="cadastro.html">Cadastre-se</a></p>
+            </footer>
+        </div>
+    </main>
 
-        // Salvar ID da sessão
-        localStorage.setItem('fittrack_usuario_atual', doc.id);
-        window.location.href = 'dashboard.html';
-    } catch (erro) {
-        aviso.textContent = '❌ Erro: ' + erro.message;
-    }
-});
-
-// --- CRIAR CONTA ---
-document.getElementById('form-criar').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const nomeCompleto = document.getElementById('nome-completo').value.trim();
-    const usuario = document.getElementById('usuario-criar').value.trim();
-    const senha = document.getElementById('senha-criar').value;
-    const aviso = document.getElementById('aviso-criar');
-
-    try {
-        // Verificar se usuário já existe
-        const existe = await db.collection('usuarios')
-            .where('usuario', '==', usuario)
-            .get();
-
-        if (!existe.empty) {
-            aviso.textContent = '⚠️ Nome de usuário já existe';
-            return;
-        }
-
-        // Criar novo usuário
-        const novoUsuario = {
-            nomeCompleto: nomeCompleto,
-            usuario: usuario,
-            senha: senha,
-            metas: { calorias: 2000, agua: 2500, atividade: 45 },
-            registros: {}
-        };
-
-        await db.collection('usuarios').add(novoUsuario);
-        aviso.textContent = '✅ Conta criada! Faça login.';
-        aviso.style.color = '#4ade80';
-        
-        // Limpar formulário
-        document.getElementById('form-criar').reset();
-        
-        // Ir para aba de login
-        document.querySelector('[data-tab="entrar"]').click();
-    } catch (erro) {
-        aviso.textContent = '❌ Erro: ' + erro.message;
-    }
-});
+    <script src="login.js"></script>
+</body>
+</html>
