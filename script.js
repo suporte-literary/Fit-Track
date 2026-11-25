@@ -1,100 +1,86 @@
-// Elementos da interface
-const formLogin = document.getElementById('form-login');
-const formCadastro = document.getElementById('form-cadastro');
-const linkParaCadastro = document.getElementById('ir-para-cadastro');
-const linkParaLogin = document.getElementById('ir-para-login');
-const subtitulo = document.getElementById('subtitulo-auth');
-const boxMensagem = document.getElementById('mensagem-feedback');
+// Configuração do Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyCLHmqR0bDmq7j-q-E0I456DlAgWMIKkgY",
+  authDomain: "fittrack-59829.firebaseapp.com",
+  projectId: "fittrack-59829",
+  storageBucket: "fittrack-59829.firebasestorage.app",
+  messagingSenderId: "384935605390",
+  appId: "1:384935605390:web:2eb5540c6e3031781a85df"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-// Função para exibir alertas na tela
-function mostrarMensagem(texto, tipo) {
-    boxMensagem.textContent = texto;
-    boxMensagem.className = `mensagem ${tipo}`;
-}
-
-function limparMensagem() {
-    boxMensagem.className = 'mensagem oculto';
-}
-
-// Alternar para a tela de Cadastro
-linkParaCadastro.addEventListener('click', (e) => {
+// --- LOGIN ---
+document.getElementById('form-login').addEventListener('submit', async (e) => {
     e.preventDefault();
-    limparMensagem();
-    formLogin.classList.add('oculto');
-    formCadastro.classList.remove('oculto');
-    subtitulo.textContent = 'Crie sua conta gratuita para começar';
-});
+    const usuario = document.getElementById('usuario-login').value.trim();
+    const senha = document.getElementById('senha-login').value;
+    const aviso = document.getElementById('aviso-login');
 
-// Alternar para a tela de Login
-linkParaLogin.addEventListener('click', (e) => {
-    e.preventDefault();
-    limparMensagem();
-    formCadastro.classList.add('oculto');
-    formLogin.classList.remove('oculto');
-    subtitulo.textContent = 'Entre na sua conta para acompanhar suas metas';
-});
+    try {
+        const snapshot = await db.collection('usuarios')
+            .where('usuario', '==', usuario)
+            .get();
 
-// Lógica de CADASTRO
-formCadastro.addEventListener('submit', (e) => {
-    e.preventDefault();
-
-    const nome = document.getElementById('cad-nome').value.trim();
-    const email = document.getElementById('cad-email').value.trim().toLowerCase();
-    const senha = document.getElementById('cad-senha').value;
-
-    // Busca usuários já cadastrados ou cria uma lista vazia
-    const usuarios = JSON.parse(localStorage.getItem('fittrack_usuarios')) || [];
-
-    // Verifica se o e-mail já existe
-    const emailJaExiste = usuarios.some(user => user.email === email);
-    if (emailJaExiste) {
-        mostrarMensagem('Este e-mail já está cadastrado. Tente fazer login.', 'erro');
-        return;
-    }
-
-    // Cria o novo usuário com metas padrão iniciais
-    const novoUsuario = {
-        nome,
-        email,
-        senha,
-        metas: {
-            calorias: 2000,
-            agua: 2500, // em ml
-            exercicio: 45 // em minutos
+        if (snapshot.empty) {
+            aviso.textContent = '⚠️ Usuário não encontrado';
+            return;
         }
-    };
 
-    usuarios.push(novoUsuario);
-    localStorage.setItem('fittrack_usuarios', JSON.stringify(usuarios));
+        const doc = snapshot.docs[0];
+        const dados = doc.data();
 
-    // Limpa o formulário, volta para o login e avisa
-    formCadastro.reset();
-    formCadastro.classList.add('oculto');
-    formLogin.classList.remove('oculto');
-    subtitulo.textContent = 'Entre na sua conta para acompanhar suas metas';
-    mostrarMensagem('Conta criada com sucesso! Agora faça seu login.', 'sucesso');
+        if (dados.senha !== senha) {
+            aviso.textContent = '⚠️ Senha incorreta';
+            return;
+        }
+
+        // Salvar ID da sessão
+        localStorage.setItem('fittrack_usuario_atual', doc.id);
+        window.location.href = 'dashboard.html';
+    } catch (erro) {
+        aviso.textContent = '❌ Erro: ' + erro.message;
+    }
 });
 
-// Lógica de LOGIN
-formLogin.addEventListener('submit', (e) => {
+// --- CRIAR CONTA ---
+document.getElementById('form-criar').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const nomeCompleto = document.getElementById('nome-completo').value.trim();
+    const usuario = document.getElementById('usuario-criar').value.trim();
+    const senha = document.getElementById('senha-criar').value;
+    const aviso = document.getElementById('aviso-criar');
 
-    const email = document.getElementById('login-email').value.trim().toLowerCase();
-    const senha = document.getElementById('login-senha').value;
+    try {
+        // Verificar se usuário já existe
+        const existe = await db.collection('usuarios')
+            .where('usuario', '==', usuario)
+            .get();
 
-    const usuarios = JSON.parse(localStorage.getItem('fittrack_usuarios')) || [];
+        if (!existe.empty) {
+            aviso.textContent = '⚠️ Nome de usuário já existe';
+            return;
+        }
 
-    // Procura usuário com e-mail e senha correspondentes
-    const usuarioValido = usuarios.find(user => user.email === email && user.senha === senha);
+        // Criar novo usuário
+        const novoUsuario = {
+            nomeCompleto: nomeCompleto,
+            usuario: usuario,
+            senha: senha,
+            metas: { calorias: 2000, agua: 2500, atividade: 45 },
+            registros: {}
+        };
 
-    if (!usuarioValido) {
-        mostrarMensagem('E-mail ou senha incorretos. Verifique ou cadastre-se.', 'erro');
-        return;
+        await db.collection('usuarios').add(novoUsuario);
+        aviso.textContent = '✅ Conta criada! Faça login.';
+        aviso.style.color = '#4ade80';
+        
+        // Limpar formulário
+        document.getElementById('form-criar').reset();
+        
+        // Ir para aba de login
+        document.querySelector('[data-tab="entrar"]').click();
+    } catch (erro) {
+        aviso.textContent = '❌ Erro: ' + erro.message;
     }
-
-    // Salva quem está logado no momento (sessão ativa)
-    localStorage.setItem('fittrack_sessao_ativa', JSON.stringify(usuarioValido));
-
-    // Avança para o painel principal
-    window.location.href = 'dashboard.html';
 });
