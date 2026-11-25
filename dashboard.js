@@ -1,28 +1,23 @@
-// ==========================================
-// AGUARDAR PÁGINA CARREGAR COMPLETAMENTE
-// ==========================================
 document.addEventListener('DOMContentLoaded', async function() {
 
-    // ==========================================
-    // FIREBASE JÁ ESTÁ INICIALIZADO NO HTML
-    // ==========================================
+    // ⏳ ESPERAR o Firebase estar pronto
+    if (typeof firebase === 'undefined') {
+        console.error('❌ Firebase não carregou! Verifique a ordem das tags <script> no HTML.');
+        alert('Erro de carregamento. Atualize a página.');
+        return;
+    }
+
     const db = firebase.firestore();
 
-    // ==========================================
-    // VERIFICAR SESSÃO
-    // ==========================================
     const usuarioId = localStorage.getItem('fittrack_usuario_atual');
     if (!usuarioId) {
         window.location.href = 'index.html';
-        return; // ⬅️ importante parar a execução
+        return;
     }
 
     let dadosUsuario = null;
     let dataSelecionada = new Date().toISOString().split('T')[0];
 
-    // ==========================================
-    // SALVAR NO FIREBASE
-    // ==========================================
     async function salvar() {
         try {
             await db.collection('usuarios').doc(usuarioId).set(dadosUsuario);
@@ -35,9 +30,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    // ==========================================
-    // CARREGAR DO FIREBASE
-    // ==========================================
     async function carregar() {
         console.log('📂 Carregando...');
         const doc = await db.collection('usuarios').doc(usuarioId).get();
@@ -53,15 +45,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         dadosUsuario = doc.data();
         console.log('✅ CARREGADO!', dadosUsuario);
         
-        // Garantir estrutura padrão
         if (!dadosUsuario.metas) dadosUsuario.metas = { calorias: 2000, agua: 2500, atividade: 45 };
         if (!dadosUsuario.registros) dadosUsuario.registros = {};
         
-        // Saudação
         const nome = dadosUsuario.nomeCompleto?.split(' ')[0] || dadosUsuario.usuario || 'Usuário';
         document.getElementById('saudacao-usuario').textContent = `Olá, ${nome}!`;
         
-        // Preencher campos das metas
         document.getElementById('meta-calorias').value = dadosUsuario.metas.calorias;
         document.getElementById('meta-agua').value = dadosUsuario.metas.agua;
         document.getElementById('meta-atividade').value = dadosUsuario.metas.atividade;
@@ -69,9 +58,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         atualizarPainel();
     }
 
-    // ==========================================
-    // SALVAR METAS
-    // ==========================================
     document.getElementById('form-metas').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -84,11 +70,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         alert('✅ Metas salvas!');
     });
 
-    // ==========================================
-    // ATUALIZAR EXIBIÇÃO DO PAINEL
-    // ==========================================
     function atualizarPainel() {
-        if (!dadosUsuario) return; // ⬅️ proteção extra
+        if (!dadosUsuario) return;
         
         const reg = dadosUsuario.registros[dataSelecionada] || { calorias:[], agua:[], atividade:[] };
         const totalCal = reg.calorias.reduce((s,i)=>s+(i.kcal||0),0);
@@ -104,9 +87,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('barra-atividade').style.width = `${Math.min((totalAtv/dadosUsuario.metas.atividade)*100,100)}%`;
     }
 
-    // ==========================================
-    // ADICIONAR REFEIÇÃO
-    // ==========================================
     document.getElementById('form-calorias').addEventListener('submit', async e => {
         e.preventDefault();
         const ref = document.getElementById('refeicao-nome').value;
@@ -121,9 +101,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('form-calorias').reset();
     });
 
-    // ==========================================
-    // ADICIONAR ÁGUA — BOTÕES RÁPIDOS
-    // ==========================================
     document.querySelectorAll('.btn-agua-rapido').forEach(btn => {
         btn.addEventListener('click', async () => {
             const ml = Number(btn.dataset.ml);
@@ -134,7 +111,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     });
 
-    // ÁGUA — PERSONALIZADA
     document.getElementById('form-agua').addEventListener('submit', async e => {
         e.preventDefault();
         const ml = Number(document.getElementById('valor-agua').value);
@@ -145,9 +121,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('valor-agua').value = '';
     });
 
-    // ==========================================
-    // ADICIONAR ATIVIDADE
-    // ==========================================
     document.getElementById('form-atividade').addEventListener('submit', async e => {
         e.preventDefault();
         const nome = document.getElementById('desc-atividade').value;
@@ -160,17 +133,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('valor-atividade').value = '';
     });
 
-    // ==========================================
-    // SAIR
-    // ==========================================
     document.getElementById('btn-sair').addEventListener('click', () => {
         localStorage.removeItem('fittrack_usuario_atual');
         window.location.href = 'index.html';
     });
 
-    // ==========================================
-    // INICIAR
-    // ==========================================
     carregar();
-
-}); // ⬅️ Fecha o DOMContentLoaded
+});
