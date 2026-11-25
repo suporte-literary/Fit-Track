@@ -1,242 +1,86 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FitTrack - Entrar</title>
-    
-    <!-- ✅ Firebase carregado globalmente (compatível com GitHub Pages) -->
-    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore-compat.js"></script>
-    
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-        body {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+// Configuração do Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyCLHmqR0bDmq7j-q-E0I456DlAgWMIKkgY",
+  authDomain: "fittrack-59829.firebaseapp.com",
+  projectId: "fittrack-59829",
+  storageBucket: "fittrack-59829.firebasestorage.app",
+  messagingSenderId: "384935605390",
+  appId: "1:384935605390:web:2eb5540c6e3031781a85df"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// --- LOGIN ---
+document.getElementById('form-login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const usuario = document.getElementById('usuario-login').value.trim();
+    const senha = document.getElementById('senha-login').value;
+    const aviso = document.getElementById('aviso-login');
+
+    try {
+        const snapshot = await db.collection('usuarios')
+            .where('usuario', '==', usuario)
+            .get();
+
+        if (snapshot.empty) {
+            aviso.textContent = '⚠️ Usuário não encontrado';
+            return;
         }
-        .card {
-            background: white;
-            border-radius: 16px;
-            padding: 32px;
-            width: 100%;
-            max-width: 420px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+
+        const doc = snapshot.docs[0];
+        const dados = doc.data();
+
+        if (dados.senha !== senha) {
+            aviso.textContent = '⚠️ Senha incorreta';
+            return;
         }
-        h1 { text-align: center; color: #10b981; margin-bottom: 8px; }
-        .subtitulo { text-align: center; color: #64748b; margin-bottom: 24px; }
-        .abas { display: flex; margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; }
-        .aba {
-            flex: 1; padding: 12px; text-align: center; cursor: pointer;
-            font-weight: 600; color: #64748b; border-bottom: 3px solid transparent;
+
+        // Salvar ID da sessão
+        localStorage.setItem('fittrack_usuario_atual', doc.id);
+        window.location.href = 'dashboard.html';
+    } catch (erro) {
+        aviso.textContent = '❌ Erro: ' + erro.message;
+    }
+});
+
+// --- CRIAR CONTA ---
+document.getElementById('form-criar').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nomeCompleto = document.getElementById('nome-completo').value.trim();
+    const usuario = document.getElementById('usuario-criar').value.trim();
+    const senha = document.getElementById('senha-criar').value;
+    const aviso = document.getElementById('aviso-criar');
+
+    try {
+        // Verificar se usuário já existe
+        const existe = await db.collection('usuarios')
+            .where('usuario', '==', usuario)
+            .get();
+
+        if (!existe.empty) {
+            aviso.textContent = '⚠️ Nome de usuário já existe';
+            return;
         }
-        .aba.ativa { color: #10b981; border-bottom-color: #10b981; }
-        form { display: flex; flex-direction: column; gap: 14px; }
-        input { padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; }
-        button {
-            padding: 12px; background-color: #10b981; color: white; border: none;
-            border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px;
-        }
-        button:hover { background-color: #059669; }
-        .mensagem { margin-top: 16px; text-align: center; font-size: 14px; min-height: 20px; }
-        .sucesso { color: #10b981; }
-        .erro { color: #ef4444; }
-        .form-cadastro { display: none; }
-        .carregando { color: #64748b; font-size: 13px; margin-bottom: 10px; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h1>FitTrack</h1>
-        <p class="subtitulo">Seu acompanhamento de saúde</p>
-        <div id="status-carregando" class="carregando">Carregando...</div>
 
-        <div class="abas" style="display: none;" id="container-abas">
-            <div class="aba ativa" id="aba-login">Entrar</div>
-            <div class="aba" id="aba-cadastro">Criar Conta</div>
-        </div>
-
-        <form id="form-login" class="form-login" style="display: none;">
-            <input type="text" id="login-usuario" placeholder="Seu nome de usuário" required>
-            <input type="password" id="login-senha" placeholder="Sua senha" required>
-            <button type="submit">Entrar</button>
-        </form>
-
-        <form id="form-cadastro" class="form-cadastro" style="display: none;">
-            <input type="text" id="cadastro-nome" placeholder="Seu nome completo" required>
-            <input type="text" id="cadastro-usuario" placeholder="Nome de usuário (sem espaços)" required>
-            <input type="password" id="cadastro-senha" placeholder="Criar senha (mínimo 6 dígitos)" required>
-            <button type="submit">Criar Conta</button>
-        </form>
-
-        <div id="mensagem" class="mensagem"></div>
-    </div>
-
-    <script>
-        // ========== INICIALIZAR FIREBASE ==========
-        const firebaseConfig = {
-          apiKey: "AIzaSyCLHmqR0bDmq7j-q-E0I456DlAgWMIKkgY",
-          authDomain: "fittrack-59829.firebaseapp.com",
-          projectId: "fittrack-59829",
-          storageBucket: "fittrack-59829.firebasestorage.app",
-          messagingSenderId: "384935605390",
-          appId: "1:384935605390:web:2eb5540c6e3031781a85df"
+        // Criar novo usuário
+        const novoUsuario = {
+            nomeCompleto: nomeCompleto,
+            usuario: usuario,
+            senha: senha,
+            metas: { calorias: 2000, agua: 2500, atividade: 45 },
+            registros: {}
         };
 
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        // Elementos
-        const statusCarregando = document.getElementById('status-carregando');
-        const containerAbas = document.getElementById('container-abas');
-        const abaLogin = document.getElementById('aba-login');
-        const abaCadastro = document.getElementById('aba-cadastro');
-        const formLogin = document.getElementById('form-login');
-        const formCadastro = document.getElementById('form-cadastro');
-        const mensagem = document.getElementById('mensagem');
-
-        // Mostrar interface
-        function mostrarInterface() {
-            statusCarregando.style.display = 'none';
-            containerAbas.style.display = 'flex';
-            formLogin.style.display = 'flex';
-        }
-
-        // Navegação entre abas
-        function mostrarAbaLogin() {
-            abaLogin.classList.add('ativa');
-            abaCadastro.classList.remove('ativa');
-            formLogin.style.display = 'flex';
-            formCadastro.style.display = 'none';
-            mensagem.textContent = '';
-        }
-
-        function mostrarAbaCadastro() {
-            abaLogin.classList.remove('ativa');
-            abaCadastro.classList.add('ativa');
-            formLogin.style.display = 'none';
-            formCadastro.style.display = 'flex';
-            mensagem.textContent = '';
-        }
-
-        abaLogin.addEventListener('click', mostrarAbaLogin);
-        abaCadastro.addEventListener('click', mostrarAbaCadastro);
-
-        // Carregar mapa de usuários
-        async function carregarMapaUsuarios() {
-            try {
-                const doc = await db.collection('config').doc('mapa_usuarios').get();
-                if (doc.exists) return doc.data();
-            } catch (e) {
-                console.log('Novo mapa de usuários');
-            }
-            return {};
-        }
-
-        async function salvarMapaUsuarios(mapa) {
-            try {
-                await db.collection('config').doc('mapa_usuarios').set(mapa);
-            } catch (e) {
-                console.error('Erro ao salvar mapa:', e);
-            }
-        }
-
-        // Cadastro
-        formCadastro.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            mensagem.textContent = '';
-            
-            const nome = document.getElementById('cadastro-nome').value.trim();
-            const usuario = document.getElementById('cadastro-usuario').value.trim().toLowerCase();
-            const senha = document.getElementById('cadastro-senha').value;
-
-            if (usuario.includes(' ')) {
-                mensagem.className = 'mensagem erro';
-                mensagem.textContent = '⚠️ Nome de usuário não pode ter espaços';
-                return;
-            }
-
-            const mapaUsuarios = await carregarMapaUsuarios();
-            
-            if (mapaUsuarios[usuario]) {
-                mensagem.className = 'mensagem erro';
-                mensagem.textContent = '⚠️ Este nome de usuário já está em uso';
-                return;
-            }
-
-            const emailFicticio = `${usuario}@fittrack-app.com`;
-
-            try {
-                const userCred = await auth.createUserWithEmailAndPassword(emailFicticio, senha);
-                const uid = userCred.user.uid;
-
-                await db.collection('usuarios').doc(uid).set({
-                    nomeCompleto: nome,
-                    usuario: usuario,
-                    email: emailFicticio,
-                    metas: { calorias: 2000, agua: 2500, atividade: 45 },
-                    registros: {}
-                });
-
-                mapaUsuarios[usuario] = emailFicticio;
-                await salvarMapaUsuarios(mapaUsuarios);
-
-                mensagem.className = 'mensagem sucesso';
-                mensagem.textContent = '✅ Conta criada! Entrando...';
-                setTimeout(() => window.location.href = 'dashboard.html', 1200);
-            } catch (erro) {
-                mensagem.className = 'mensagem erro';
-                console.error(erro);
-                if (erro.code === 'auth/email-already-in-use') {
-                    mensagem.textContent = '⚠️ Este nome de usuário já existe';
-                } else if (erro.code === 'auth/weak-password') {
-                    mensagem.textContent = '⚠️ A senha precisa ter pelo menos 6 caracteres';
-                } else {
-                    mensagem.textContent = '❌ Erro: ' + erro.message;
-                }
-            }
-        });
-
-        // Login
-        formLogin.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            mensagem.textContent = '';
-            
-            const usuario = document.getElementById('login-usuario').value.trim().toLowerCase();
-            const senha = document.getElementById('login-senha').value;
-
-            const mapaUsuarios = await carregarMapaUsuarios();
-            const email = mapaUsuarios[usuario];
-
-            if (!email) {
-                mensagem.className = 'mensagem erro';
-                mensagem.textContent = '⚠️ Usuário não encontrado';
-                return;
-            }
-
-            try {
-                await auth.signInWithEmailAndPassword(email, senha);
-                mensagem.className = 'mensagem sucesso';
-                mensagem.textContent = '✅ Entrando...';
-                setTimeout(() => window.location.href = 'dashboard.html', 800);
-            } catch (erro) {
-                mensagem.className = 'mensagem erro';
-                if (erro.code === 'auth/user-not-found' || erro.code === 'auth/wrong-password') {
-                    mensagem.textContent = '⚠️ Usuário ou senha incorretos';
-                } else {
-                    mensagem.textContent = '❌ Erro: ' + erro.message;
-                }
-            }
-        });
-
-        // Inicializar
-        mostrarInterface();
-    </script>
-</body>
-</html>
+        await db.collection('usuarios').add(novoUsuario);
+        aviso.textContent = '✅ Conta criada! Faça login.';
+        aviso.style.color = '#4ade80';
+        
+        // Limpar formulário
+        document.getElementById('form-criar').reset();
+        
+        // Ir para aba de login
+        document.querySelector('[data-tab="entrar"]').click();
+    } catch (erro) {
+        aviso.textContent = '❌ Erro: ' + erro.message;
+    }
+});
