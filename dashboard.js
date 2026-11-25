@@ -231,3 +231,63 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
 
         // Eventos para remover itens
+        document.querySelectorAll('.btn-remover').forEach(btn => {
+btn.addEventListener('click', async () => {
+const tipo = btn.dataset.tipo;
+const index = Number(btn.dataset.index);
+dadosUsuario.registros[dataSelecionada][tipo].splice(index, 1);
+await salvar();
+atualizarPainel();
+});
+});
+}
+// Calendário
+function renderizarCalendario() {
+const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+document.getElementById('mes-ano-atual').textContent = ${meses[mesAtual]} ${anoAtual};
+const grade = document.getElementById('grade-dias');
+grade.innerHTML = '';
+const primeiroDia = new Date(anoAtual, mesAtual, 1).getDay();
+const ultimoDia = new Date(anoAtual, mesAtual + 1, 0).getDate();
+const hojeISO = formatarDataLocal(new Date());
+for (let i = 0; i < primeiroDia; i++) {
+grade.appendChild(document.createElement('span'));
+}
+for (let dia = 1; dia <= ultimoDia; dia++) {
+const btn = document.createElement('button');
+btn.type = 'button';
+btn.textContent = dia;
+const iso = ${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')};
+if (iso === dataSelecionada) btn.classList.add('selecionado');
+if (iso === hojeISO) btn.classList.add('hoje');
+btn.addEventListener('click', () => {
+dataSelecionada = iso;
+renderizarCalendario();
+atualizarPainel();
+});
+grade.appendChild(btn);
+}
+}
+document.getElementById('mes-anterior').addEventListener('click', () => {
+mesAtual--;
+if (mesAtual < 0) {
+mesAtual = 11;
+anoAtual--;
+}
+renderizarCalendario();
+});
+document.getElementById('proximo-mes').addEventListener('click', () => {
+mesAtual++;
+if (mesAtual > 11) {
+mesAtual = 0;
+anoAtual++;
+}
+renderizarCalendario();
+});
+// Sair
+document.getElementById('btn-sair').addEventListener('click', () => {
+localStorage.removeItem('fittrack_usuario_atual');
+window.location.href = 'index.html';
+});
+carregar();
+});
